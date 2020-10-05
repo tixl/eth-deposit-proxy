@@ -1,6 +1,6 @@
 import Compiler from "./Compiler"
 import Contract from "./Contract"
-import Generator from "./Generator"
+import Receiver from "./Receiver"
 import EthersWallet from "../ethers/EthersWallet"
 import { ethers } from "ethers"
 
@@ -31,7 +31,7 @@ export default class Collector {
 }
 
 let _collect = (address: string) => Contract.code(`
-${Generator.code(address)}
+${Receiver.code(address)}
 
 contract Collect {
     address private immutable _owner;

@@ -2,7 +2,7 @@ import Compiler from "./Compiler"
 import Contract from "./Contract"
 import { ethers } from "ethers"
 
-export default class Generator {
+export default class Receiver {
     static code(address: string): string {
         return _receive(address)
     }

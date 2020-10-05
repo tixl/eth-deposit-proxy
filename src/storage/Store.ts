@@ -7,14 +7,8 @@ class Store {
         return new _Range(key, value, root, next)
     }
 
-    /** Close this store. */
-    static async close(store: Store): Promise<void> {
-        await store._model.close()
-    }
-
-    constructor(model: Store | Store.Model, topic?: Bytes) {
-        this._model = is(model, Store) ? model._model : model
-        this._topic = bytes(is(model, Store) && model._topic.length ? [...model._topic, ...(topic || [])] : topic)
+    constructor(model: Store.Model) {
+        this._model = model
     }
 
     /** Find a record mapped to the key. */
@@ -40,13 +34,26 @@ class Store {
         await this._model.batch(t)
     }
 
+    /** Close this store. */
+    async close(): Promise<void> {
+        await this._model.close()
+    }
+
+    /** Create a new store with all keys having the `topic` prefix applied automatically. */
+    topic(topic: Bytes): Store {
+        if (!topic.length) return this
+        let t = new Store(this._model)
+        t._topic = this._topic.length ? bytes([...this._topic, ...topic]) : topic
+        return t
+    }
+
     private _key(key: Bytes): Bytes {
         if (!key.length) return this._topic
         return this._topic.length ? bytes([...this._topic, ...key]) : key
     }
 
     private _model: Store.Model
-    private _topic: Bytes
+    private _topic = bytes()
 }
 
 namespace Store {

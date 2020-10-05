@@ -46,7 +46,7 @@ export default class RocksDBStore implements Store.Model {
         return new Promise((done: (value: Store.Range | void) => void): void => {
             if (!this._db) return done()
             let t = this._db.iterator({ gte: _bytes(prefix) })
-            t.next((error: Error | void, key: string | Buffer, value: string | Buffer): void => {
+            t.next((error: Error | void, key: Buffer | string, value: Buffer | string): void => {
                 if (error) return done()
                 let k = bytes(key as Buffer)
                 let v = bytes(value as Buffer)
@@ -78,7 +78,7 @@ export default class RocksDBStore implements Store.Model {
 function _range(iterator: RocksDB.Iterator, key: Bytes, value: Bytes, scope: Bytes): Store.Range | void {
     return Store.range(key, value, scope, async (): Promise<Store.Range | void> => {
         return await new Promise((done: (value: Store.Range | void) => void): void => {
-            iterator.next((error: Error | void, key: string | Buffer, value: string | Buffer): void => {
+            iterator.next((error: Error | void, key: Buffer | string, value: Buffer | string): void => {
                 if (error) return iterator.end((_error?: Error): void => done())
                 done(_range(iterator, bytes(key as Buffer), bytes(value as Buffer), scope))
             })

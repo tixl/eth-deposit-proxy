@@ -4,12 +4,12 @@ class Reader {
     static unsigned(data: Bytes): Reader.Token<int> {
         let t = 0
         for (let i = 0; i < data.length; i++) {
-            if (t >= 0x400000000000) return { value: 0, bytes: data }
+            assert(t <= 0x3FFFFFFFFFFF)
             let v = data[i]
             t = (t * 128) + (v & 127)
             if (v <= 127) return { value: t, bytes: data.subarray(i + 1) }
         }
-        return { value: 0, bytes: data }
+        assert(false)
     }
 
     static bytes(data: Bytes, size: int): Reader.Token<Bytes> {

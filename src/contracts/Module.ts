@@ -30,9 +30,9 @@ export default class Module {
     }
 
     create(context: Bytes): string {
-        let t = ethers.utils.arrayify(ethers.utils.keccak256(context))
+        let t = ethers.utils.keccak256(context)
         console.log(Buffer.from(context).toString())
-        console.log(this.creator, ethers.utils.hexlify(t), ethers.utils.keccak256(this._receive.bytecode))
+        console.log(this.creator, t, ethers.utils.keccak256(this._receive.bytecode))
         return ethers.utils.getCreate2Address(this.creator, t, ethers.utils.keccak256(this._receive.bytecode))
     }
 

@@ -1,6 +1,7 @@
 import { Payment, Provider, Transaction, Key, Public } from "./EthersTypes"
 import { ethers } from "ethers"
 import JSBI from "jsbi"
+import { bytes } from "../core/Core"
 
 class EthersProvider implements Provider {
     static readonly model = `${process.env["HOME"]}/.rinkeby/geth.ipc` as EthersProvider.Model
@@ -36,7 +37,7 @@ class EthersProvider implements Provider {
     async transaction(hash: string): Promise<Payment> {
         let t = await this._provider.getTransaction(hash)
         let s = ethers.utils.joinSignature({ r: t.r as string, s: t.s, v: t.v })
-        let m = ethers.utils.arrayify(hash || "0x")
+        let m = hash ? ethers.utils.arrayify(hash) : bytes()
         let k = { type: "Public", data: ethers.utils.arrayify(ethers.utils.recoverPublicKey(m, s)) } as Key<Public>
         return {
             transaction: {

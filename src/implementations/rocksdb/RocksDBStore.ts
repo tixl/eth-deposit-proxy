@@ -7,7 +7,7 @@ import nodePath from "path"
 export default class RocksDBStore implements Store.Model {
     /** Create a new store. */
     static async create(path?: string): Promise<Store> {
-        return new Promise<Store>((done: (value: Store) => void, fail: () => void): void => {
+        return await new Promise<Store>((done: (value: Store) => void, fail: () => void): void => {
             let t = new RocksDBStore(path || "Data")
             t._db.open((error?: Error): void => error ? fail() : done(new Store(t)))
         })
@@ -19,10 +19,10 @@ export default class RocksDBStore implements Store.Model {
 
     async get(key: Bytes): Promise<Bytes> {
         if (!key.length) {
-            let t = global.Buffer.from("__RocksDB.zero__")
+            let t = global.Buffer.from(_zero)
             key = bytes(t)
         }
-        return new Promise<Bytes>((done: (value: Bytes) => void): void => {
+        return await new Promise<Bytes>((done: (value: Bytes) => void): void => {
             this._db.get(_bytes(key), (error: Error | undefined, value: Buffer | string): void => {
                 done(!error && value ? bytes(value as Buffer) : bytes())
             })
@@ -31,19 +31,19 @@ export default class RocksDBStore implements Store.Model {
 
     async set(key: Bytes, value: Bytes): Promise<void> {
         if (!key.length) {
-            let t = global.Buffer.from("__RocksDB.zero__")
+            let t = global.Buffer.from(_zero)
             key = bytes(t)
         }
-        if (!value.length) return new Promise<void>((done: () => void, fail: () => void): void => {
+        if (!value.length) return await new Promise<void>((done: () => void, fail: () => void): void => {
             this._db.del(_bytes(key), (error?: Error): void => error ? fail() : done())
         })
-        return new Promise<void>((done: () => void, fail: () => void): void => {
+        return await new Promise<void>((done: () => void, fail: () => void): void => {
             this._db.put(_bytes(key), _bytes(value), (error?: Error): void => error ? fail() : done())
         })
     }
 
     async range(prefix: Bytes): Promise<Store.Range | void> {
-        return new Promise((done: (value: Store.Range | void) => void): void => {
+        return await new Promise((done: (value: Store.Range | void) => void): void => {
             if (!this._db) return done()
             let t = this._db.iterator({ gte: _bytes(prefix) })
             t.next((error: Error | void, key: Buffer | string, value: Buffer | string): void => {
@@ -55,15 +55,11 @@ export default class RocksDBStore implements Store.Model {
         })
     }
 
-    async batch(items: readonly (readonly [Bytes, Bytes] | Bytes)[]): Promise<void> {
-        if (items.length) return new Promise<void>((done: () => void, fail: () => void): void => {
+    async batch(items: readonly Store.Entry[]): Promise<void> {
+        if (items.length) return await new Promise<void>((done: () => void, fail: () => void): void => {
             this._db.batch(items.map(x => {
-                if (is(x, Array as unknown as new () => readonly [Bytes, Bytes])) {
-                    let k = x[0].length ? _bytes(x[0]) : global.Buffer.from("__LEVELDB_EMPTY__")
-                    return x[1].length ? { type: "put", key: k, value: _bytes(x[1]) } : { type: "del", key: k }
-                }
-                let k = x.length ? _bytes(x) : global.Buffer.from("__LEVELDB_EMPTY__")
-                return { type: "del", key: k }
+                let k = x[0].length ? _bytes(x[0]) : global.Buffer.from(_zero)
+                return x[1].length ? { type: "put", key: k, value: _bytes(x[1]) } : { type: "del", key: k }
             }), (error?: {}): void => error ? fail() : done())
         })
     }
@@ -89,3 +85,5 @@ function _range(iterator: RocksDB.Iterator, key: Bytes, value: Bytes, scope: Byt
 function _bytes(data: Bytes): Buffer {
     return Buffer.from(data.buffer as ArrayBuffer, data.byteOffset, data.length)
 }
+
+let _zero = "__RocksDB.zero__"

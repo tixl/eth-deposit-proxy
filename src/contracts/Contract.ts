@@ -5,8 +5,8 @@ import { ethers } from "ethers"
 export default class Contract {
     static create(address: string, bytecode: Bytes, context: Bytes): string {
         let a = address
-        let s = ethers.utils.arrayify(ethers.utils.keccak256(context))
-        let b = ethers.utils.arrayify(ethers.utils.keccak256(bytecode))
+        let s = ethers.utils.keccak256(context)
+        let b = ethers.utils.keccak256(bytecode)
         return ethers.utils.getCreate2Address(a, s, b)
     }
 

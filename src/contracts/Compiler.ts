@@ -1,5 +1,6 @@
 import solc from "solc"
 import { ethers } from "ethers"
+import { bytes } from "../core/Core"
 
 class Compiler {
     static compile(code: string): Compiler.Result {
@@ -31,7 +32,7 @@ function _convert(main: { readonly [name: string]: import("solc").Contract }): C
     let t = {} as { [contract: string]: Compiler.Module | void }
     for (let i of Object.entries(main)) t[i[0]] = {
         abi: i[1].abi || [],
-        bytecode: ethers.utils.arrayify(`0x${i[1].evm?.bytecode?.object || ""}`),
+        bytecode: i[1].evm?.bytecode?.object ? ethers.utils.arrayify(`0x${i[1].evm?.bytecode?.object}`) : bytes(),
     }
     return t
 }

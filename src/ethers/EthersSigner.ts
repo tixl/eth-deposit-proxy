@@ -1,12 +1,13 @@
 import { inject } from "../core/System"
 import { ethers } from "ethers"
 import EthersProvider from "./EthersProvider"
-import axios from "axios"
+import fetch from "node-fetch"
+import { bytes } from "../core/Core"
 
 export default class EthersSigner {
     static from(mnemonic: string): EthersSigner {
         let t = ethers.Wallet.fromMnemonic(mnemonic).connect(inject(EthersProvider)["_provider"])
-        let k = new ethers.utils.SigningKey(ethers.utils.arrayify(t.privateKey || "0x"))
+        let k = new ethers.utils.SigningKey(ethers.utils.arrayify(t.privateKey))
         return new EthersSigner(async data => {
             let t = k.signDigest(ethers.utils.keccak256(data))
             return ethers.utils.arrayify(ethers.utils.joinSignature(t))
@@ -49,8 +50,8 @@ class _Signer {
     }
 
     async sign(data: Bytes): Promise<Bytes> {
-        let t = await axios.get(`${this._host}sign/${ethers.utils.hexlify(data)}`)
-        return ethers.utils.arrayify(t.data as string || "0x")
+        let t = await (await fetch(`${this._host}sign/${ethers.utils.hexlify(data)}`)).text()
+        return t ? ethers.utils.arrayify(t) : bytes()
     }
 
     private _host: string

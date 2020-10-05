@@ -1,4 +1,4 @@
-import { bytes, is } from "../../core/Core"
+import { bytes } from "../../core/Core"
 import Store from "../../storage/Store"
 import RocksDB from "rocksdb"
 import nodePath from "path"

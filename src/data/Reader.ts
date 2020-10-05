@@ -1,4 +1,4 @@
-import { assert, bytes, unsigned } from "../core/Core"
+import { assert, bytes, is, unsigned } from "../core/Core"
 
 class Reader {
     static unsigned(data: Bytes): Reader.Token<int> {
@@ -12,11 +12,13 @@ class Reader {
         assert(false)
     }
 
-    static bytes(data: Bytes, size: int): Reader.Token<Bytes> {
-        assert(unsigned(size) <= data.length)
-        if (!size) return { value: bytes(), bytes: data }
-        if (size == data.length) return { value: data, bytes: bytes() }
-        return { value: data.subarray(0, size), bytes: data.subarray(size) }
+    static bytes(data: Bytes, size?: int): Reader.Token<Bytes> {
+        let t = { value: unsigned(size || 0), bytes: data } as const
+        if (!is(size)) t = this.unsigned(data)
+        assert(t.value <= t.bytes.length)
+        if (!t.value) return { value: bytes(), bytes: t.bytes }
+        if (t.value == t.bytes.length) return { value: t.bytes, bytes: bytes() }
+        return { value: t.bytes.subarray(0, t.value), bytes: t.bytes.subarray(t.value) }
     }
 }
 

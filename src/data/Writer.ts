@@ -18,6 +18,10 @@ class Writer {
         for (let i of values) t = _write(t, i)
         return t
     }
+
+    static bytes(data: Bytes): Bytes {
+        return this.packed([this.unsigned(data.length), data])
+    }
 }
 
 namespace Writer {

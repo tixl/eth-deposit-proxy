@@ -1,8 +1,6 @@
 import { ethers } from "ethers"
 import { Express } from "express"
 import { inject } from "../core/System"
-import EthersSigner from "../ethers/EthersSigner"
-import Receiver from "../contracts/Receiver"
 import Service from "./Service"
 
 export default (host: Express) => {
@@ -10,8 +8,6 @@ export default (host: Express) => {
         let k = Buffer.from(req.body.chainSigPubKey as string, "hex")
         let t = inject(Service)
         await t.add(k)
-        let s = await inject(EthersSigner).sign(k)
-        let a = t.receive(k)
-        res.end({ address: a, signature: ethers.utils.hexlify(s).slice(2) })
+        res.end({ address: t.receive(k), signature: ethers.utils.hexlify(t.sign(k)).slice(2) })
     })
 }

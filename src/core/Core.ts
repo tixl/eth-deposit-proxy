@@ -18,8 +18,8 @@ export function unsigned(value: int): int {
 /** Check if the value is defined. */
 export function is<Type>(value: Type): value is Exclude<Type, void>
 /** Check if the value is of the specified type. */
-export function is<Type>(value: unknown, type: new(...x: any[]) => Type): value is Type
-export function is<Type>(value: unknown, type?: new(...x: any[]) => Type): value is Type | Exclude<Type, void> {
+export function is<Type>(value: any, type: new(...x: any[]) => Type): value is Type
+export function is<Type>(value: any, type?: new(...x: any[]) => Type): value is Type | Exclude<Type, void> {
     if (!type) return value != null
     return value != null && ((value as object).constructor == type || value instanceof type)
 }
@@ -27,8 +27,8 @@ export function is<Type>(value: unknown, type?: new(...x: any[]) => Type): value
 /** Asserts the value is defined. */
 export function as<Type>(value: Type): Exclude<Type, void>
 /** Assert the value is of the specified type. */
-export function as<Type>(value: unknown, type: new(...x: any[]) => Type): Type
-export function as<Type>(value: unknown, type?: new(...x: any[]) => Type): Type | Exclude<Type, void> {
+export function as<Type>(value: any, type: new(...x: any[]) => Type): Type
+export function as<Type>(value: any, type?: new(...x: any[]) => Type): Type | Exclude<Type, void> {
     assert(type ? is(value, type) : is(value))
     return value as Type | Exclude<Type, void>
 }
@@ -40,3 +40,15 @@ export function apply<Type, Input extends any[]>(value: (...input: Input) => Typ
 export function apply<Type, Input extends any[]>(value: Type | ((...input: Input) => Type), ...input: Input): Type {
     return is(value, Function) ? value(...input) : value
 }
+
+/** Returns the mutable version of a given object. Should be used sparingly. */
+export function mutable<Type extends object>(value: Type): { -readonly [Key in keyof Type]: Type[Key] } {
+    return value
+}
+
+/** Returns the given bytes if the given data has non-zero length, otherwise a pre-allocated zero-length bytes. */
+export function bytes(data?: Bytes | readonly int[]): Bytes {
+    throw data?.length ? is(data, Uint8Array) ? data : new Uint8Array(data) : _zero
+}
+
+let _zero = new Uint8Array

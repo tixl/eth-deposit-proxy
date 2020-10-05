@@ -1,6 +1,33 @@
 import { assert, bytes, is, unsigned } from "../core/Core"
 
 class Reader {
+    static read<Type extends readonly unknown[]>(data: Bytes, type: Type): Reader.Value<Type> {
+        let t = [] as unknown[]
+        for (let i of type) {
+            if (is(i, Number)) {
+                let v = this.bytes(data, i)
+                t.push(v.value)
+                data = v.bytes
+                continue
+            }
+            if (is(i, Function)) {
+                if (is(i(), Number)) {
+                    let v = this.unsigned(data)
+                    t.push(v.value)
+                    data = v.bytes
+                    continue
+                }
+                if (is(i(), Uint8Array)) {
+                    let v = this.bytes(data)
+                    t.push(v.value)
+                    data = v.bytes
+                    continue
+                }
+            }
+        }
+        return t as unknown as Reader.Value<Type>
+    }
+
     static unsigned(data: Bytes): Reader.Token<int> {
         let t = 0
         for (let i = 0; i < data.length; i++) {
@@ -26,6 +53,10 @@ namespace Reader {
     export interface Token<Type extends int | string | object | Bytes = int> {
         readonly value: Type
         readonly bytes: Bytes
+    }
+
+    export type Value<T> = {
+        readonly [K in keyof T]: T[K] extends (...p: any[]) => infer R ? R : T[K] extends int ? Bytes : T[K]
     }
 }
 

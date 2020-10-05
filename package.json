@@ -1,7 +1,6 @@
 {
   "name": "eth-deposit-proxy",
   "version": "0.0.0",
-  "main": "index.js",
   "author": "Tixl Team <team@tixl.me>",
   "license": "MIT",
   "scripts": {

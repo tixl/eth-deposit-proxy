@@ -1,14 +1,7 @@
 import { unsigned, bytes } from "../core/Core"
 
 class Writer {
-    static unsigned(value: int): Bytes {
-        if (!value) return _zero
-        let t = [] as int[]
-        for (let i = unsigned(value); i; i = (i - (i & 127)) / 128) t.push(i >= 128 ? 128 | (i & 127) : i)
-        return bytes(t)
-    }
-
-    static packed(values: readonly Bytes[]): Bytes {
+    static pack(values: readonly Bytes[]): Bytes {
         let n = 0
         for (let i of values) n += i.length
         if (!n) return bytes()
@@ -19,8 +12,15 @@ class Writer {
         return t
     }
 
+    static unsigned(value: int): Bytes {
+        if (!value) return _zero
+        let t = [] as int[]
+        for (let i = unsigned(value); i; i = (i - (i & 127)) / 128) t.push(i >= 128 ? 128 | (i & 127) : i)
+        return bytes(t)
+    }
+
     static bytes(data: Bytes): Bytes {
-        return this.packed([this.unsigned(data.length), data])
+        return this.pack([this.unsigned(data.length), data])
     }
 
     static string(value: string): Bytes {

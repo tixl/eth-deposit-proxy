@@ -7,6 +7,6 @@ export default (host: Express) => {
         let k = Buffer.from(req.body.chainSigPubKey as string, "hex")
         let t = inject(Service)
         await t.add(k)
-        res.end({ address: t.receive(k), signature: Buffer.from(t.sign(k)).toString("hex") })
+        res.end({ address: t.receive(k), signature: Buffer.from(t.sign(k, k)).toString("hex") })
     })
 }

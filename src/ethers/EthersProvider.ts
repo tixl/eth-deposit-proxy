@@ -11,7 +11,7 @@ class EthersProvider implements Provider {
     }
 
     async blocks(): Promise<int> {
-        return await this._provider.getBlockNumber()
+        return await this._provider.getBlockNumber() + 1
     }
 
     async block(block: int): Promise<readonly string[]> {

@@ -17,6 +17,12 @@ class Reader {
                     data = v.bytes
                     continue
                 }
+                if (is(i(), String)) {
+                    let v = this.string(data)
+                    t.push(v.value)
+                    data = v.bytes
+                    continue
+                }
                 if (is(i(), Uint8Array)) {
                     let v = this.bytes(data)
                     t.push(v.value)

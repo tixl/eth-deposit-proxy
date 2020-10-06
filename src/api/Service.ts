@@ -7,8 +7,9 @@ import EthersProvider from "../ethers/EthersProvider"
 import Store from "../storage/Store"
 import Reader from "../data/Reader"
 import { ethers } from "ethers"
+import JSBI from "jsbi"
 
-export default class Service {
+class Service {
     constructor(key?: Bytes) {
         if (key?.length) this._key = key
     }
@@ -25,7 +26,7 @@ export default class Service {
     }
 
     receive(key: Bytes): string {
-        return this._receiver.receive(Writer.packed([this._key, key]))
+        return this._receiver.receive(Writer.pack([this._key, key]))
     }
 
     async at(index: int): Promise<Bytes> {
@@ -43,18 +44,25 @@ export default class Service {
         assert(false)
     }
 
+    async record(index: int): Promise<Service.Record> {
+        assert(unsigned(index) < this.size)
+        let t = Reader.read(await this._data.get(Writer.unsigned(index)), [bytes, unsigned, String] as const).value
+        return {
+            key: t[0],
+            address: this.receive(t[0]),
+            block: t[1],
+            balance: JSBI.BigInt(t[2]),
+        }
+    }
+
     async update(): Promise<void> {
         let t = await this._data.get(bytes())
         this._n = t.length ? Reader.unsigned(t).value : 0
         for (let i = 0; i < this.size; i++) {
-            let t = await this._data.get(Writer.unsigned(i))
-            let v = Reader.read(t, [bytes, unsigned, String] as const).value
-            let a = this.receive(v[0])
-            let b = await this.provider.balance(a)
-            if (`${b}` != `${v[2]}`) {
-                let t = [Writer.bytes(v[0]), Writer.unsigned(await this.provider.blocks()), Writer.string(`${b}`)]
-                await this._data.set(Writer.unsigned(i), Writer.packed(t))
-            }
+            let t = await this.record(i)
+            let b = await this.provider.balance(t.address)
+            if (`${b}` == `${t.balance}`) continue
+            await this._update(i, { ...t, balance: b, block: await this.provider.blocks() - 1 })
         }
     }
 
@@ -62,19 +70,31 @@ export default class Service {
         for await (let i of this) if (_equals(i, key)) return
         await this._task.work(async () => await this._data.batch([
             [bytes(), Writer.unsigned(this.size + 1)],
-            [Writer.unsigned(this.size), Writer.packed([Writer.bytes(key), Writer.unsigned(0), Writer.string("0")])],
+            [Writer.unsigned(this.size), Writer.pack([Writer.bytes(key), Writer.unsigned(0), Writer.string("0")])],
         ]))
         this._n++
     }
 
-    async *[Symbol.asyncIterator](): AsyncIterator<Bytes> {
-        let n = await this.size
-        for (let i = 0; i < n; i++) yield await this.at(i)
+    async find(balance: Natural, confirmations: int): Promise<readonly Service.Record[]> {
+        return await this._filter(`${balance}`, unsigned(confirmations), await this.provider.blocks())
     }
 
-    private async _update(): Promise<void> {
-        let t = await this._data.get(bytes())
-        this._n = t.length ? Reader.unsigned(t).value : 0
+    async *[Symbol.asyncIterator](): AsyncIterator<Bytes> {
+        for (let i = 0; i < this.size; i++) yield await this.at(i)
+    }
+
+    private async _update(index: int, value: Service.Record): Promise<void> {
+        let t = [Writer.bytes(value.key), Writer.unsigned(value.block), Writer.string(`${value.balance}`)]
+        await this._data.set(Writer.unsigned(index), Writer.pack(t))
+    }
+
+    private async _filter(balance: string, confirmations: int, blocks: int): Promise<readonly Service.Record[]> {
+        let t = [] as Service.Record[]
+        for (let i = 0; i < this.size; i++) {
+            let v = await this.record(i)
+            if (`${v.balance}` >= balance && blocks >= (v.block || blocks) + confirmations) t.push(v)
+        }
+        return t
     }
 
     private _receiver = inject(Receiver)
@@ -82,6 +102,15 @@ export default class Service {
     private _task = new _Task
     private _key = bytes()
     private _n = 0
+}
+
+namespace Service {
+    export interface Record {
+        readonly key: Bytes
+        readonly address: string
+        readonly block: int
+        readonly balance: Natural
+    }
 }
 
 class _Task {
@@ -126,14 +155,4 @@ function _equals(a: Bytes, b: Bytes): boolean {
     return true
 }
 
-interface _Update {
-    readonly request: {
-        readonly balance?: Natural
-        readonly confirmations?: int
-    }
-    readonly response: readonly {
-        readonly address: string
-        readonly balance: Natural
-        readonly confirmations: int
-    }[]
-}
+export default Service

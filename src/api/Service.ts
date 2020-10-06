@@ -1,4 +1,4 @@
-import { bytes } from "../core/Core"
+import { assert, bytes, unsigned } from "../core/Core"
 import { inject } from "../core/System"
 import Collector from "../contracts/Collector"
 import Receiver from "../contracts/Receiver"
@@ -13,12 +13,14 @@ export default class Service {
         if (key?.length) this._key = key
     }
 
-    get block(): int {
+    readonly provider = inject(EthersProvider)
+
+    get size(): int {
         return this._n
     }
 
-    sign(data: Bytes): Bytes {
-        let t = new ethers.utils.SigningKey(this._key)
+    sign(key: Bytes, data: Bytes): Bytes {
+        let t = new ethers.utils.SigningKey(ethers.utils.keccak256(ethers.utils.concat([key, this._key])))
         return ethers.utils.arrayify(ethers.utils.joinSignature(t.signDigest(ethers.utils.keccak256(data))))
     }
 
@@ -26,53 +28,112 @@ export default class Service {
         return this._receiver.receive(Writer.packed([this._key, key]))
     }
 
-    async wait(): Promise<void> {
-        for (let i = await this._block(); true; i = await this._block()) if (i != this.block) {
-            this._n = i
-            return
-        }
+    async at(index: int): Promise<Bytes> {
+        assert(unsigned(index) < this.size)
+        return Reader.bytes(await this._data.get(Writer.unsigned(index))).value
     }
 
-    async start(): Promise<never> {
-        while (true) {
-            await this.wait()
-            await this.scan()
+    async index(key: Bytes): Promise<int> {
+        for (let i = 0; i < this.size; i++) if (_equals(key, await this.at(i))) return i
+        assert(false)
+    }
+
+    async key(address: string): Promise<Bytes> {
+        for await (let i of this) if (this.receive(i) == address) return i
+        assert(false)
+    }
+
+    async update(): Promise<void> {
+        let t = await this._data.get(bytes())
+        this._n = t.length ? Reader.unsigned(t).value : 0
+        for (let i = 0; i < this.size; i++) {
+            let t = await this._data.get(Writer.unsigned(i))
+            let v = Reader.read(t, [bytes, unsigned, String] as const).value
+            let a = this.receive(v[0])
+            let b = await this.provider.balance(a)
+            if (`${b}` != `${v[2]}`) {
+                let t = [Writer.bytes(v[0]), Writer.unsigned(await this.provider.blocks()), Writer.string(`${b}`)]
+                await this._data.set(Writer.unsigned(i), Writer.packed(t))
+            }
         }
     }
 
     async add(key: Bytes): Promise<void> {
-        let t = Writer.packed([bytes([0, 0]), key])
-        if (await this._data.get(t)) return
-        let n = await this._data.get(bytes())
-        await this._data.batch([[t, n], [n, t], [bytes(), Writer.unsigned(Reader.unsigned(n).value + 1)]])
+        for await (let i of this) if (_equals(i, key)) return
+        await this._task.work(async () => await this._data.batch([
+            [bytes(), Writer.unsigned(this.size + 1)],
+            [Writer.unsigned(this.size), Writer.packed([Writer.bytes(key), Writer.unsigned(0), Writer.string("0")])],
+        ]))
+        this._n++
     }
 
-    async balance(key: Bytes): Promise<Natural> {
-        return await this._provider.balance(this.receive(key))
+    async *[Symbol.asyncIterator](): AsyncIterator<Bytes> {
+        let n = await this.size
+        for (let i = 0; i < n; i++) yield await this.at(i)
     }
 
-    async scan(): Promise<void> {
-        for await (let i of await this._data.range(bytes([0, 0]))) {
-            let t = i[0].subarray(2)
-            // await this._scan(t)
-        }
+    private async _update(): Promise<void> {
+        let t = await this._data.get(bytes())
+        this._n = t.length ? Reader.unsigned(t).value : 0
     }
 
-    private async _block(): Promise<int> {
-        return await this._provider["_provider"].getBlockNumber()
-    }
-
-    private _collector = inject(Collector)
     private _receiver = inject(Receiver)
-    private _provider = inject(EthersProvider)
     private _data = inject(Store)
+    private _task = new _Task
     private _key = bytes()
     private _n = 0
 }
 
-function _equal(a: Bytes, b: Bytes): boolean {
+class _Task {
+    get busy(): boolean {
+        return Boolean(this._busy)
+    }
+    set busy(busy: boolean) {
+        if (busy) this._work()
+        if (!busy) this._rest()
+    }
+
+    async wait(): Promise<void> {
+        if (this.busy) await this._busy
+    }
+
+    async work(work: () => Promise<void>): Promise<void> {
+        await this.wait()
+        this.busy = true
+        await work()
+        this.busy = false
+    }
+
+    private _work(): void {
+        if (!this.busy) this._busy = new Promise((done: () => void): void => { this._done = done })
+    }
+
+    private _rest(): void {
+        if (!this.busy) return
+        if (this._done) this._done()
+        this._done = void 0
+        this._busy = void 0
+    }
+
+    private _done = void 0 as (() => void) | void
+    private _busy = void 0 as Promise<void> | void
+}
+
+function _equals(a: Bytes, b: Bytes): boolean {
     if (a.length != b.length) return false
     let n = a.length
     for (let i = 0; i < n; i++) if (a[i] != b[i]) return false
     return true
+}
+
+interface _Update {
+    readonly request: {
+        readonly balance?: Natural
+        readonly confirmations?: int
+    }
+    readonly response: readonly {
+        readonly address: string
+        readonly balance: Natural
+        readonly confirmations: int
+    }[]
 }

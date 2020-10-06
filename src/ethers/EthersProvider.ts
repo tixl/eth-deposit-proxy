@@ -1,13 +1,21 @@
 import { Payment, Provider, Transaction, Key, Public } from "./EthersTypes"
 import { ethers } from "ethers"
 import JSBI from "jsbi"
-import { bytes } from "../core/Core"
+import { bytes, unsigned } from "../core/Core"
 
 class EthersProvider implements Provider {
     static readonly model = `${process.env["HOME"]}/.rinkeby/geth.ipc` as EthersProvider.Model
 
     constructor(model?: EthersProvider.Model) {
         this._provider = _connection(model || EthersProvider.model)
+    }
+
+    async blocks(): Promise<int> {
+        return await this._provider.getBlockNumber()
+    }
+
+    async block(block: int): Promise<readonly string[]> {
+        return (await this._provider.getBlock(unsigned(block))).transactions
     }
 
     async balance(address: string): Promise<Natural> {
@@ -78,6 +86,7 @@ namespace EthersProvider {
 
     export interface WebSocketConnection {
         readonly type: "WebSocket"
+        readonly host: string
     }
 
     export interface HTTPConnection {

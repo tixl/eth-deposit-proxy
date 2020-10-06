@@ -24,6 +24,12 @@ export interface Wallet {
 
 /** Provider interface (e.g. geth). */
 export interface Provider {
+    /** Block height. */
+    blocks(): Promise<int>
+
+    /** List of transaction hashes.included in a given block */
+    block(block: int): Promise<readonly string[]>
+
     /** Balance of address. */
     balance(address: string): Promise<Natural>
 

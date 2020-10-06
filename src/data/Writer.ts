@@ -22,6 +22,10 @@ class Writer {
     static bytes(data: Bytes): Bytes {
         return this.packed([this.unsigned(data.length), data])
     }
+
+    static string(value: string): Bytes {
+        return this.bytes(value.length ? _utf8.encode(value) : bytes())
+    }
 }
 
 namespace Writer {
@@ -36,6 +40,7 @@ function _write(bytes: Uint8Array, value: Bytes): Uint8Array {
     return value.length ? bytes.subarray(value.length) : bytes
 }
 
+let _utf8 = new TextEncoder
 let _zero = bytes([0])
 
 export default Writer

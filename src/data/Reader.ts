@@ -1,7 +1,7 @@
 import { assert, bytes, is, unsigned } from "../core/Core"
 
 class Reader {
-    static read<Type extends readonly unknown[]>(data: Bytes, type: Type): Reader.Value<Type> {
+    static read<Type extends readonly unknown[]>(data: Bytes, type: Type): Reader.Token<Reader.Value<Type>> {
         let t = [] as unknown[]
         for (let i of type) {
             if (is(i, Number)) {
@@ -25,7 +25,7 @@ class Reader {
                 }
             }
         }
-        return t as unknown as Reader.Value<Type>
+        return { value: t as unknown as Reader.Value<Type>, bytes: data }
     }
 
     static unsigned(data: Bytes): Reader.Token<int> {
@@ -47,6 +47,11 @@ class Reader {
         if (t.value == t.bytes.length) return { value: t.bytes, bytes: bytes() }
         return { value: t.bytes.subarray(0, t.value), bytes: t.bytes.subarray(t.value) }
     }
+
+    static string(data: Bytes): Reader.Token<string> {
+        let t = this.bytes(data)
+        return { value: t.value.length ? _utf8.decode(t.value) : "", bytes: t.bytes }
+    }
 }
 
 namespace Reader {
@@ -59,5 +64,7 @@ namespace Reader {
         readonly [K in keyof T]: T[K] extends (...p: infer _P) => infer R ? R : T[K] extends int ? Bytes : T[K]
     }
 }
+
+let _utf8 = new TextDecoder
 
 export default Reader

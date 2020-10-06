@@ -12,19 +12,19 @@ class Writer {
         return t
     }
 
-    static unsigned(value: int): Bytes {
+    static unsigned(value?: int): Bytes {
         if (!value) return _zero
         let t = [] as int[]
         for (let i = unsigned(value); i; i = (i - (i & 127)) / 128) t.push(i >= 128 ? 128 | (i & 127) : i)
         return bytes(t)
     }
 
-    static bytes(data: Bytes): Bytes {
-        return this.pack([this.unsigned(data.length), data])
+    static bytes(data?: Bytes): Bytes {
+        return this.pack([this.unsigned(data?.length || 0), data || bytes()])
     }
 
-    static string(value: string): Bytes {
-        return this.bytes(value.length ? _utf8.encode(value) : bytes())
+    static string(value?: string): Bytes {
+        return this.bytes(value?.length ? _utf8.encode(value) : bytes())
     }
 }
 

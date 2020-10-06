@@ -31,12 +31,20 @@ class Service {
 
     async at(index: int): Promise<Service.Record> {
         assert(unsigned(index) < this.size)
-        let t = Reader.read(await this._data.get(Writer.unsigned(index)), [bytes, unsigned, String] as const).value
+        let r = await this._data.get(Writer.unsigned(index))
+        let t = Reader.read(r, [bytes, unsigned, String, String] as const).value as readonly [
+            key: Bytes,
+            block: int,
+            balance: string,
+            transaction: string,
+        ]
         return {
+            index,
             key: t[0],
             address: this.receive(t[0]),
             block: t[1],
             balance: JSBI.BigInt(t[2]),
+            transaction: t[3],
         }
     }
 
@@ -63,9 +71,9 @@ class Service {
             [Writer.string(this.receive(key)), Writer.unsigned(this.size)],
             [Writer.unsigned(this.size), Writer.pack([
                 Writer.bytes(key),
-                Writer.unsigned(0),
+                Writer.unsigned(),
                 Writer.string("0"),
-                Writer.bytes(bytes()),
+                Writer.bytes(),
             ])],
         ]))
         this._n++
@@ -102,10 +110,12 @@ class Service {
 
 namespace Service {
     export interface Record {
+        readonly index: int
         readonly key: Bytes
         readonly address: string
         readonly block: int
         readonly balance: Natural
+        readonly transaction: string
     }
 }
 

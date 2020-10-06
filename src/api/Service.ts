@@ -29,22 +29,7 @@ class Service {
         return this._receiver.receive(Writer.pack([this._key, key]))
     }
 
-    async at(index: int): Promise<Bytes> {
-        assert(unsigned(index) < this.size)
-        return Reader.bytes(await this._data.get(Writer.unsigned(index))).value
-    }
-
-    async index(key: Bytes): Promise<int> {
-        for (let i = 0; i < this.size; i++) if (_equals(key, await this.at(i))) return i
-        assert(false)
-    }
-
-    async key(address: string): Promise<Bytes> {
-        for await (let i of this) if (this.receive(i) == address) return i
-        assert(false)
-    }
-
-    async record(index: int): Promise<Service.Record> {
+    async at(index: int): Promise<Service.Record> {
         assert(unsigned(index) < this.size)
         let t = Reader.read(await this._data.get(Writer.unsigned(index)), [bytes, unsigned, String] as const).value
         return {
@@ -55,11 +40,16 @@ class Service {
         }
     }
 
+    async index(address: string): Promise<int | void> {
+        let t = await this._data.get(Writer.string(address))
+        if (t.length) return Reader.unsigned(t).value
+    }
+
     async update(): Promise<void> {
         let t = await this._data.get(bytes())
         this._n = t.length ? Reader.unsigned(t).value : 0
         for (let i = 0; i < this.size; i++) {
-            let t = await this.record(i)
+            let t = await this.at(i)
             let b = await this.provider.balance(t.address)
             if (`${b}` == `${t.balance}`) continue
             await this._update(i, { ...t, balance: b, block: await this.provider.blocks() - 1 })
@@ -67,10 +57,16 @@ class Service {
     }
 
     async add(key: Bytes): Promise<void> {
-        for await (let i of this) if (_equals(i, key)) return
+        for await (let i of this) if (_equals(i.key, key)) return
         await this._task.work(async () => await this._data.batch([
             [bytes(), Writer.unsigned(this.size + 1)],
-            [Writer.unsigned(this.size), Writer.pack([Writer.bytes(key), Writer.unsigned(0), Writer.string("0")])],
+            [Writer.string(this.receive(key)), Writer.unsigned(this.size)],
+            [Writer.unsigned(this.size), Writer.pack([
+                Writer.bytes(key),
+                Writer.unsigned(0),
+                Writer.string("0"),
+                Writer.bytes(bytes()),
+            ])],
         ]))
         this._n++
     }
@@ -79,7 +75,7 @@ class Service {
         return await this._filter(`${balance}`, unsigned(confirmations), await this.provider.blocks())
     }
 
-    async *[Symbol.asyncIterator](): AsyncIterator<Bytes> {
+    async *[Symbol.asyncIterator](): AsyncIterator<Service.Record> {
         for (let i = 0; i < this.size; i++) yield await this.at(i)
     }
 
@@ -91,7 +87,7 @@ class Service {
     private async _filter(balance: string, confirmations: int, blocks: int): Promise<readonly Service.Record[]> {
         let t = [] as Service.Record[]
         for (let i = 0; i < this.size; i++) {
-            let v = await this.record(i)
+            let v = await this.at(i)
             if (`${v.balance}` >= balance && blocks >= (v.block || blocks) + confirmations) t.push(v)
         }
         return t

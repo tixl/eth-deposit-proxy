@@ -56,7 +56,7 @@ namespace Reader {
     }
 
     export type Value<T> = {
-        readonly [K in keyof T]: T[K] extends (...p: any[]) => infer R ? R : T[K] extends int ? Bytes : T[K]
+        readonly [K in keyof T]: T[K] extends (...p: infer _P) => infer R ? R : T[K] extends int ? Bytes : T[K]
     }
 }
 

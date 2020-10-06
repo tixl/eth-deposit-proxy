@@ -33,8 +33,8 @@ export class Scope {
 }
 
 export namespace Scope {
-    export type Instance<Type extends object> = Type extends new (...p: any[]) => infer Result ? Result : Type
-    export type Provider<Type extends object> = Instance<Type> | (() => Instance<Type>)
+    export type Instance<Type> = Type extends new (...p: infer _Parameters) => infer Result ? Result : Type
+    export type Provider<Type> = Instance<Type> | (() => Instance<Type>)
 }
 
 export function inject<Type extends object>(type: Type, fail?: Scope.Provider<Type>): Scope.Instance<Type> {

@@ -59,7 +59,7 @@ class Service {
         for (let i = 0; i < this.size; i++) {
             let t = await this.at(i)
             let b = await this.provider.balance(t.address)
-            if (`${b}` == `${t.balance}`) continue
+            if (!_compare(b, t.balance)) continue
             await this._update(i, { ...t, balance: b, block: await this.provider.blocks() - 1 })
         }
     }
@@ -80,12 +80,16 @@ class Service {
     }
 
     async find(balance: Natural, confirmations: int): Promise<readonly Service.Record[]> {
-        return await this._filter(`${balance}`, unsigned(confirmations), await this.provider.blocks())
+        return await this._filter(balance, unsigned(confirmations), await this.provider.blocks())
     }
 
     async collect(record: Service.Record): Promise<Transaction | void> {
+        if (`${record.balance}` == "0") return
         let t = await this._collector.transaction(record.key)
-        if (t) return await this._collector.sign(t)
+        if (t) t = await this._collector.sign(t)
+        let s = t ? t.signed[0].signatures[0].data : bytes()
+        if (s) await this._update(record.index, { ...record, transaction: Buffer.from(s).toString("hex") })
+        if (t) return t
     }
 
     async *[Symbol.asyncIterator](): AsyncIterator<Service.Record> {
@@ -101,11 +105,11 @@ class Service {
         ]))
     }
 
-    private async _filter(balance: string, confirmations: int, blocks: int): Promise<readonly Service.Record[]> {
+    private async _filter(balance: Natural, confirmations: int, blocks: int): Promise<readonly Service.Record[]> {
         let t = [] as Service.Record[]
         for (let i = 0; i < this.size; i++) {
             let v = await this.at(i)
-            if (`${v.balance}` >= balance && blocks >= (v.block || blocks) + confirmations) t.push(v)
+            if (_compare(v.balance, balance) >= 0 && blocks >= (v.block || blocks) + confirmations) t.push(v)
         }
         return t
     }
@@ -169,6 +173,10 @@ function _equals(a: Bytes, b: Bytes): boolean {
     let n = a.length
     for (let i = 0; i < n; i++) if (a[i] != b[i]) return false
     return true
+}
+
+function _compare(a: Natural, b: Natural): int {
+    return JSBI.greaterThan(a, b) ? 1 : JSBI.lessThan(a, b) ? - 1 : 0
 }
 
 export default Service

@@ -1,11 +1,18 @@
 import { inject } from "../core/System"
 import Service from "./Service"
 import { Express } from "express"
+import { is } from "../core/Core"
 
 export default (host: Express) => {
-    host.get("/status/:InTxHash", async (req, res) => {
-        let k = Buffer.from(req.body.chainSigPubKey as string, "hex")
+    host.get("/status/:address", async (req, res) => {
+        let a = req.params.address as string
         let t = inject(Service)
-
+        let n = await t.index(a)
+        if (!is(n)) return res.end()
+        let r = await t.at(n)
+        res.end({
+            confirmations: r.block ? await t.provider.blocks() - r.block : 0,
+            transaction: r.transaction,
+        })
     })
 }

@@ -2,12 +2,12 @@ import { assert, bytes, unsigned } from "../core/Core"
 import { inject } from "../core/System"
 import Collector from "../contracts/Collector"
 import Receiver from "../contracts/Receiver"
-import Writer from "../data/Writer"
 import EthersProvider from "../ethers/EthersProvider"
 import Store from "../storage/Store"
-import Reader from "../data/Reader"
+import Data from "../data/Data"
 import { ethers } from "ethers"
 import JSBI from "jsbi"
+import { Transaction } from "../ethers/EthersTypes"
 
 class Service {
     constructor(key?: Bytes) {
@@ -26,18 +26,18 @@ class Service {
     }
 
     receive(key: Bytes): string {
-        return this._receiver.receive(Writer.pack([this._key, key]))
+        return this._receiver.receive(Data.packed.encode([this._key, key]))
     }
 
     async at(index: int): Promise<Service.Record> {
         assert(unsigned(index) < this.size)
-        let r = await this._data.get(Writer.unsigned(index))
-        let t = Reader.read(r, [bytes, unsigned, String, String] as const).value as readonly [
-            key: Bytes,
-            block: int,
-            balance: string,
-            transaction: string,
-        ]
+        let r = await this._data.get(Data.unsigned.encode(index))
+        let t = Data.read(r, read => ({
+            key: read(Data.bytes),
+            block: read(Data.unsigned),
+            balance: JSBI.BigInt(read(Data.string)),
+            transaction: read(Data.string),
+        } as const))
         return {
             index,
             key: t[0],
@@ -49,13 +49,13 @@ class Service {
     }
 
     async index(address: string): Promise<int | void> {
-        let t = await this._data.get(Writer.string(address))
-        if (t.length) return Reader.unsigned(t).value
+        let t = await this._data.get(Data.string.encode(address))
+        if (t.length) return Data.unsigned.decode(t).value
     }
 
     async update(): Promise<void> {
         let t = await this._data.get(bytes())
-        this._n = t.length ? Reader.unsigned(t).value : 0
+        this._n = t.length ? Data.unsigned.decode(t).value : 0
         for (let i = 0; i < this.size; i++) {
             let t = await this.at(i)
             let b = await this.provider.balance(t.address)
@@ -67,13 +67,13 @@ class Service {
     async add(key: Bytes): Promise<void> {
         for await (let i of this) if (_equals(i.key, key)) return
         await this._task.work(async () => await this._data.batch([
-            [bytes(), Writer.unsigned(this.size + 1)],
-            [Writer.string(this.receive(key)), Writer.unsigned(this.size)],
-            [Writer.unsigned(this.size), Writer.pack([
-                Writer.bytes(key),
-                Writer.unsigned(),
-                Writer.string("0"),
-                Writer.bytes(),
+            [bytes(), Data.unsigned.encode(this.size + 1)],
+            [Data.string.encode(this.receive(key)), Data.unsigned.encode(this.size)],
+            [Data.unsigned.encode(this.size), Data.packed.encode([
+                Data.bytes.encode(key),
+                Data.unsigned.encode(),
+                Data.string.encode("0"),
+                Data.bytes.encode(),
             ])],
         ]))
         this._n++
@@ -83,13 +83,22 @@ class Service {
         return await this._filter(`${balance}`, unsigned(confirmations), await this.provider.blocks())
     }
 
+    async collect(record: Service.Record): Promise<Transaction | void> {
+        let t = await this._collector.transaction(record.key)
+        if (t) return await this._collector.sign(t)
+    }
+
     async *[Symbol.asyncIterator](): AsyncIterator<Service.Record> {
         for (let i = 0; i < this.size; i++) yield await this.at(i)
     }
 
     private async _update(index: int, value: Service.Record): Promise<void> {
-        let t = [Writer.bytes(value.key), Writer.unsigned(value.block), Writer.string(`${value.balance}`)]
-        await this._data.set(Writer.unsigned(index), Writer.pack(t))
+        await this._data.set(Data.unsigned.encode(index), Data.packed.encode([
+            Data.bytes.encode(value.key),
+            Data.unsigned.encode(value.block),
+            Data.string.encode(`${value.balance}`),
+            Data.string.encode(`${value.transaction}`),
+        ]))
     }
 
     private async _filter(balance: string, confirmations: int, blocks: int): Promise<readonly Service.Record[]> {
@@ -101,6 +110,7 @@ class Service {
         return t
     }
 
+    private _collector = inject(Collector)
     private _receiver = inject(Receiver)
     private _data = inject(Store)
     private _task = new _Task

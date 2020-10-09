@@ -10,8 +10,12 @@ class EthersProvider implements Provider {
         this._provider = _connection(model || EthersProvider.model)
     }
 
-    async blocks(): Promise<int> {
-        return await this._provider.getBlockNumber() + 1
+    get blocks(): int {
+        return this._blocks
+    }
+
+    async update(): Promise<void> {
+        this._blocks = await this._provider.getBlockNumber() + 1
     }
 
     async block(block: int): Promise<readonly string[]> {
@@ -70,6 +74,7 @@ class EthersProvider implements Provider {
     }
 
     private _provider: ethers.providers.Provider
+    private _blocks = 0
 }
 
 namespace EthersProvider {

@@ -1,25 +1,24 @@
 import { bytes } from "../../core/Core"
 import Store from "../../storage/Store"
 import RocksDB from "rocksdb"
-import nodePath from "path"
 
 /** Store backed by RocksDB. */
 export default class RocksDBStore implements Store.Model {
     /** Create a new store. */
     static async create(path?: string): Promise<Store> {
         return await new Promise<Store>((done: (value: Store) => void, fail: () => void): void => {
-            let t = new RocksDBStore(path || "Data")
+            let t = new RocksDBStore(path)
             t._db.open((error?: Error): void => error ? fail() : done(new Store(t)))
         })
     }
 
     constructor(path?: string) {
-        this._db = new RocksDB(nodePath.posix.relative("", `${__dirname}/${path || "data"}`))
+        this._db = new RocksDB(path || "data")
     }
 
     async get(key: Bytes): Promise<Bytes> {
         if (!key.length) {
-            let t = global.Buffer.from(_zero)
+            let t = _zero
             key = bytes(t)
         }
         return await new Promise<Bytes>((done: (value: Bytes) => void): void => {
@@ -31,7 +30,7 @@ export default class RocksDBStore implements Store.Model {
 
     async set(key: Bytes, value: Bytes): Promise<void> {
         if (!key.length) {
-            let t = global.Buffer.from(_zero)
+            let t = _zero
             key = bytes(t)
         }
         if (!value.length) return await new Promise<void>((done: () => void, fail: () => void): void => {
@@ -56,11 +55,19 @@ export default class RocksDBStore implements Store.Model {
     }
 
     async batch(items: readonly Store.Entry[]): Promise<void> {
+        if (items.length == 1) {
+            await this.set(items[0][0], items[0][1])
+            return
+        }
         if (items.length) return await new Promise<void>((done: () => void, fail: () => void): void => {
-            this._db.batch(items.map(x => {
-                let k = x[0].length ? _bytes(x[0]) : global.Buffer.from(_zero)
+            console.log(items.map(x => {
+                let k = x[0].length ? _bytes(x[0]) : _zero
                 return x[1].length ? { type: "put", key: k, value: _bytes(x[1]) } : { type: "del", key: k }
-            }), (error?: {}): void => error ? fail() : done())
+            }))
+            this._db.batch(items.map(x => {
+                let k = x[0].length ? _bytes(x[0]) : _zero
+                return x[1].length ? { type: "put", key: k, value: _bytes(x[1]) } : { type: "del", key: k }
+            }), error => error ? void fail() : void done())
         })
     }
 
@@ -86,4 +93,4 @@ function _bytes(data: Bytes): Buffer {
     return Buffer.from(data.buffer as ArrayBuffer, data.byteOffset, data.length)
 }
 
-let _zero = "__RocksDB.zero__"
+let _zero = Buffer.from("__RocksDB.zero__")

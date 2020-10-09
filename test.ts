@@ -1,13 +1,14 @@
-/// <reference types="." />
+/// <reference types="./src" />
 import express from 'express'
-import { inject, bind } from "./core/System"
-import EthersProvider from './ethers/EthersProvider'
-import EthersSigner from './ethers/EthersSigner'
-import api from "./api"
-import Store from './storage/Store'
-import RocksDBStore from './implementations/rocksdb/RocksDBStore'
-import Service from './api/Service'
+import { inject, bind } from "./src/core/System"
+import EthersProvider from './src/ethers/EthersProvider'
+import EthersSigner from './src/ethers/EthersSigner'
+import api from "./src/api"
+import Store from './src/storage/Store'
+import RocksDBStore from './src/implementations/rocksdb/RocksDBStore'
+import Service from './src/api/Service'
 import { ethers } from 'ethers'
+import Data from './src/data/Data'
 
 class Settings {
   // Geth (or compatible) server
@@ -26,16 +27,15 @@ bind(EthersProvider, new EthersProvider(inject(Settings).server))
   * `bind(EthersSigner, new EthersSigner(async (dataToSign: Bytes) => returnSignedDataAsBytes(dataToSign))) */
 bind(EthersSigner, EthersSigner.from(inject(Settings).mnemonic))
 
-const app = express()
-app.use(express.json())
-
 ; (async () => {
-    let db = await RocksDBStore.create(".data")
+    const app = express()
+    app.use(express.json())
+    const port = process.env.PORT || 4000
+    app.listen(port)
+    console.log(`Service listening on port ${port}`)
+
+    let db = await RocksDBStore.create("data")
     bind(Store, new Store(db))
     bind(Service, new Service(ethers.utils.arrayify(ethers.Wallet.fromMnemonic(inject(Settings).mnemonic).privateKey), inject(Settings).address))
     api(app)
 })()
-
-const port = process.env.PORT || 4000
-app.listen(port)
-console.log(`Service listening on port ${port}`)

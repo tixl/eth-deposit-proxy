@@ -25,7 +25,10 @@ export interface Wallet {
 /** Provider interface (e.g. geth). */
 export interface Provider {
     /** Block height. */
-    blocks(): Promise<int>
+    readonly blocks: int
+
+    /** Update the state (currently only number of blocks). */
+    update(): Promise<void>
 
     /** List of transaction hashes.included in a given block */
     block(block: int): Promise<readonly string[]>

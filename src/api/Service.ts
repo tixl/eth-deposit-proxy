@@ -1,7 +1,7 @@
 import { assert, bytes, unsigned } from "../core/Core"
 import { inject } from "../core/System"
-import Collector from "../contracts/Collector"
-import Receiver from "../contracts/Receiver"
+import Collector from "./Collector"
+import Receiver from "./Receiver"
 import EthersProvider from "../ethers/EthersProvider"
 import Store from "../storage/Store"
 import Data from "../data/Data"
@@ -10,8 +10,10 @@ import JSBI from "jsbi"
 import { Transaction } from "../ethers/EthersTypes"
 
 class Service {
-    constructor(key?: Bytes) {
+    constructor(key: Bytes, address: string) {
         if (key?.length) this._key = key
+        this._receiver = new Receiver(this._key)
+        this._collector = new Collector(this._key, address)
     }
 
     readonly provider = inject(EthersProvider)
@@ -20,31 +22,31 @@ class Service {
         return this._n
     }
 
-    sign(key: Bytes, data: Bytes): Bytes {
-        let t = new ethers.utils.SigningKey(ethers.utils.keccak256(ethers.utils.concat([key, this._key])))
+    sign(context: Bytes, data: Bytes): Bytes {
+        let t = new ethers.utils.SigningKey(ethers.utils.keccak256(ethers.utils.concat([context, this._key])))
         return ethers.utils.arrayify(ethers.utils.joinSignature(t.signDigest(ethers.utils.keccak256(data))))
     }
 
-    receive(key: Bytes): string {
-        return this._receiver.receive(Data.packed.encode([this._key, key]))
+    receive(context: Bytes): string {
+        return this._receiver.receive(context)
     }
 
     async at(index: int): Promise<Service.Record> {
         assert(unsigned(index) < this.size)
         let r = await this._data.get(Data.unsigned.encode(index))
         let t = Data.read(r, read => ({
-            key: read(Data.bytes),
+            context: read(Data.bytes),
             block: read(Data.unsigned),
             balance: JSBI.BigInt(read(Data.string)),
             transaction: read(Data.string),
         } as const))
         return {
             index,
-            key: t[0],
-            address: this.receive(t[0]),
-            block: t[1],
-            balance: JSBI.BigInt(t[2]),
-            transaction: t[3],
+            context: t.context,
+            address: this.receive(t.context),
+            block: t.block,
+            balance: t.balance,
+            transaction: t.transaction,
         }
     }
 
@@ -55,22 +57,24 @@ class Service {
 
     async update(): Promise<void> {
         let t = await this._data.get(bytes())
-        this._n = t.length ? Data.unsigned.decode(t).value : 0
+        await this.provider.update()
+        if (!t.length) return
+        this._n = Data.unsigned.decode(t).value
         for (let i = 0; i < this.size; i++) {
             let t = await this.at(i)
             let b = await this.provider.balance(t.address)
             if (!_compare(b, t.balance)) continue
-            await this._update(i, { ...t, balance: b, block: await this.provider.blocks() - 1 })
+            await this._update(i, { ...t, balance: b, block: this.provider.blocks - 1 })
         }
     }
 
-    async add(key: Bytes): Promise<void> {
-        for await (let i of this) if (_equals(i.key, key)) return
+    async add(context: Bytes): Promise<void> {
+        for await (let i of this) if (_equals(i.context, context)) return
         await this._task.work(async () => await this._data.batch([
             [bytes(), Data.unsigned.encode(this.size + 1)],
-            [Data.string.encode(this.receive(key)), Data.unsigned.encode(this.size)],
+            [Data.string.encode(this.receive(context)), Data.unsigned.encode(this.size)],
             [Data.unsigned.encode(this.size), Data.packed.encode([
-                Data.bytes.encode(key),
+                Data.bytes.encode(context),
                 Data.unsigned.encode(),
                 Data.string.encode("0"),
                 Data.bytes.encode(),
@@ -80,14 +84,14 @@ class Service {
     }
 
     async find(balance: Natural, confirmations: int): Promise<readonly Service.Record[]> {
-        return await this._filter(balance, unsigned(confirmations), await this.provider.blocks())
+        return await this._filter(balance, unsigned(confirmations), this.provider.blocks)
     }
 
     async collect(record: Service.Record): Promise<Transaction | void> {
         if (`${record.balance}` == "0") return
-        let t = await this._collector.transaction(record.key)
-        if (t) t = await this._collector.sign(t)
-        let s = t ? t.signed[0].signatures[0].data : bytes()
+        let t = await this._collector.transaction(record.context)
+        if (t) t = await this._collector.sign(record.context, t)
+        let s = t ? t.signed[0] ? ethers.utils.arrayify(ethers.utils.keccak256(t.signed[0].data)) : bytes() : bytes()
         if (s) await this._update(record.index, { ...record, transaction: Buffer.from(s).toString("hex") })
         if (t) return t
     }
@@ -98,7 +102,7 @@ class Service {
 
     private async _update(index: int, value: Service.Record): Promise<void> {
         await this._data.set(Data.unsigned.encode(index), Data.packed.encode([
-            Data.bytes.encode(value.key),
+            Data.bytes.encode(value.context),
             Data.unsigned.encode(value.block),
             Data.string.encode(`${value.balance}`),
             Data.string.encode(`${value.transaction}`),
@@ -114,8 +118,8 @@ class Service {
         return t
     }
 
-    private _collector = inject(Collector)
-    private _receiver = inject(Receiver)
+    private _collector: Collector
+    private _receiver: Receiver
     private _data = inject(Store)
     private _task = new _Task
     private _key = bytes()
@@ -125,7 +129,7 @@ class Service {
 namespace Service {
     export interface Record {
         readonly index: int
-        readonly key: Bytes
+        readonly context: Bytes
         readonly address: string
         readonly block: int
         readonly balance: Natural

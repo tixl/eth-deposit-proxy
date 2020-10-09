@@ -5,8 +5,8 @@ class Data {
         encode(value?: int): Bytes {
             if (!value) return this._zero
             let t = [] as int[]
-            for (let i = unsigned(value); i; i = (i - (i & 127)) / 128) t.push(i >= 128 ? 128 | (i & 127) : i)
-            return bytes(t)
+            for (let i = unsigned(value); i; i = (i - (i & 127)) / 128) t.push(t.length ? (i & 127) | 128 : i & 127)
+            return bytes(t.reverse())
         }
 
         decode(data: Bytes): Data.Part<int> {
@@ -54,7 +54,7 @@ class Data {
             if (a.length == 1) return a[0]
             let t = new Uint8Array(n)
             for (let i of a) t = (t.set(i), t.subarray(i.length))
-            return t
+            return new Uint8Array(t.buffer)
         }
 
         decode(data: Bytes, type?: readonly Data.Type<Bytes>[]): Data.Part<readonly Bytes[]> {
@@ -99,24 +99,20 @@ class Data {
     }
 
     static pack(type: (pack: <T>(type: Data.Type<T>, value: T) => T) => void): Bytes {
-        let n = 0
         let t = [] as Bytes[]
         type((pack, value) => {
             let p = pack.encode(value)
-            if (p.length) t.push(p)
-            n += p.length
+            if (!p.length) return value
+            t.push(p)
             return value
         })
-        if (t.length <= 1) return t.length ? t[0] : bytes()
-        let r = new Uint8Array(n)
-        for (let i of t) r = (r.set(i), r.subarray(i.length))
-        return r
+        return this.packed.encode(t)
     }
 
     static read<Type>(data: Bytes, type: (read: <T>(type: Data.Type<T>) => T) => Type): Type {
         let v = void 0
         let s = data
-        return type(type => {
+        return type((type: Data.Type<any>): any => {
             let t = type.decode(s)
             v = t.value
             s = t.stack

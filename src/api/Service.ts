@@ -8,6 +8,7 @@ import Data from "../data/Data"
 import { ethers } from "ethers"
 import JSBI from "jsbi"
 import { Transaction } from "../ethers/EthersTypes"
+import EthersEngine from "../ethers/EthersEngine"
 
 class Service {
     constructor(key: Bytes, address: string) {
@@ -91,9 +92,11 @@ class Service {
         if (`${record.balance}` == "0") return
         let t = await this._collector.transaction(record.context)
         if (t) t = await this._collector.sign(record.context, t)
-        let s = t ? t.signed[0] ? ethers.utils.arrayify(ethers.utils.keccak256(t.signed[0].data)) : bytes() : bytes()
-        if (s) await this._update(record.index, { ...record, transaction: Buffer.from(s).toString("hex") })
-        if (t) return t
+        if (!t || !t.signed.length) return
+        let s = ethers.utils.arrayify(ethers.utils.keccak256(EthersEngine.signables(t)[0].data))
+        let r = { ...record, transaction: Buffer.from(s).toString("hex") }
+        await this._update(record.index, r)
+        return t
     }
 
     async *[Symbol.asyncIterator](): AsyncIterator<Service.Record> {

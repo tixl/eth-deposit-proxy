@@ -31,8 +31,6 @@ export default class Module {
 
     create(context: Bytes): string {
         let t = ethers.utils.keccak256(context)
-        console.log(Buffer.from(context).toString())
-        console.log(this.creator, t, ethers.utils.keccak256(this._receive.bytecode))
         return ethers.utils.getCreate2Address(this.creator, t, ethers.utils.keccak256(this._receive.bytecode))
     }
 

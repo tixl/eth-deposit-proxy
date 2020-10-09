@@ -60,10 +60,6 @@ export default class RocksDBStore implements Store.Model {
             return
         }
         if (items.length) return await new Promise<void>((done: () => void, fail: () => void): void => {
-            console.log(items.map(x => {
-                let k = x[0].length ? _bytes(x[0]) : _zero
-                return x[1].length ? { type: "put", key: k, value: _bytes(x[1]) } : { type: "del", key: k }
-            }))
             this._db.batch(items.map(x => {
                 let k = x[0].length ? _bytes(x[0]) : _zero
                 return x[1].length ? { type: "put", key: k, value: _bytes(x[1]) } : { type: "del", key: k }

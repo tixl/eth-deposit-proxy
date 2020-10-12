@@ -30,7 +30,7 @@ const app = express()
 app.use(express.json())
 
 ; (async () => {
-    let db = await RocksDBStore.create(".data")
+    let db = await RocksDBStore.create()
     bind(Store, new Store(db))
     bind(Service, new Service(ethers.utils.arrayify(ethers.Wallet.fromMnemonic(inject(Settings).mnemonic).privateKey), inject(Settings).address))
     api(app)

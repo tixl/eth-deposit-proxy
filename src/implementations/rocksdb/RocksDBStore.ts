@@ -4,7 +4,7 @@ import RocksDB from "rocksdb"
 
 /** Store backed by RocksDB. */
 export default class RocksDBStore implements Store.Model {
-    /** Create a new store. */
+    /** Create a new store, optionally using a directory relative to the current working directory (default: "data"). */
     static async create(path?: string): Promise<Store> {
         return await new Promise<Store>((done: (value: Store) => void, fail: () => void): void => {
             let t = new RocksDBStore(path)

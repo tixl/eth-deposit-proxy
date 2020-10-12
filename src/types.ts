@@ -1,7 +1,7 @@
 /// <reference types="." />
 
 /** Wallet interface (can be remote signer). */
-export interface Wallet {
+export interface Wallet extends Signer {
     /** List of addresses in the wallet (the list returned is not guaranteed to be commlete, so additional calls to
       * list(lastKnownAddress) are required). */
     addresses(afterAddress?: string): Promise<readonly string[]>
@@ -15,11 +15,20 @@ export interface Wallet {
     /** Generate a new address for receiving (optionally skip a specified number of addresses). */
     receive(skipAddresses?: int): Promise<string>
 
-    /** Sign provided data. */
-    sign(data: Signing.Signable): Promise<Signed>
-
     /** Return the public key of the signer. */
     key(signer: string): Promise<Key.Public>
+}
+
+/** Signature service. */
+export interface Signer {
+    /** Sign the provided data. */
+    sign(data: Signing.Signable): Promise<Signing.Signature>
+}
+
+/** Signature verifier. */
+export interface Verifier {
+    /** Verify the provided digest and signature. */
+    verify(data: Signing.Signable, signature: Signing.Signature): boolean
 }
 
 /** Provider interface (e.g. geth). */

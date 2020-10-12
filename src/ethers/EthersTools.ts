@@ -1,6 +1,7 @@
 import { int, is } from "../core/Core"
 import { ethers } from "ethers"
 import JSBI from "jsbi"
+import { Key, Signing } from "./EthersTypes"
 
 /** Hex encoding and decoding. */
 export class Hex {
@@ -47,11 +48,19 @@ export class Big {
 /** Provides ability to sign any data. */
 export class Signer {
     /** Sign any data with a private key. */
-    static sign(data: Bytes, key: Bytes): Bytes {
+    static sign(data: Signing.Digest, key: Key.Private): Signing.Signature {
         let d = ethers.utils.keccak256(data)
         let k = new ethers.utils.SigningKey(key)
         let s = k.signDigest(d)
-        return Hex.decode(ethers.utils.joinSignature(s))
+        return Hex.decode(ethers.utils.joinSignature(s)) as Signing.Signature
+    }
+}
+
+/** Digest generation. */
+export class Digest {
+    /** Create a digest of input data. */
+    static from(...data: readonly Bytes[]): Signing.Digest {
+        return Hex.decode(ethers.utils.keccak256(ethers.utils.concat(data as Uint8Array[]))) as Signing.Digest
     }
 }
 

@@ -15,7 +15,7 @@ A JSON configuration object `.config.json` complient with the following interfac
 {
     server: string // url to Geth server, e.g. "http://207.154.253.13:8545"
     address: string // where the money is sent to (pool address), e.g.: "0x0dF22FdeD1D944365B6561B7a620a48E3f4D3CCe"
-    key: string // signing key (mnemonic words or hex encoded private key)
+    key: string // signing key (hex encoded private key)
 }
 ```
 

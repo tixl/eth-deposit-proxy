@@ -15,8 +15,21 @@ class EthersProvider implements Provider {
         return this._blocks
     }
 
+    get chain(): int {
+        return this._chain
+    }
+
+    get gas(): { readonly limit: Natural, readonly price: Natural } {
+        return this._gas
+    }
+
     async update(): Promise<void> {
+        if (!this._chain) this._chain = (await this._provider.getNetwork()).chainId
         this._blocks = await this._provider.getBlockNumber() + 1
+        this._gas = {
+            limit: Big.int(await this._provider.estimateGas({})),
+            price: Big.int(await this._provider.getGasPrice()),
+        }
     }
 
     async block(block: int): Promise<readonly string[]> {
@@ -48,7 +61,9 @@ class EthersProvider implements Provider {
     }
 
     private _provider: ethers.providers.Provider
+    private _gas = { limit: Big.int(), price: Big.int() } as const
     private _blocks = 0
+    private _chain = 0
 }
 
 namespace EthersProvider {

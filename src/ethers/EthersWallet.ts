@@ -27,7 +27,7 @@ export default class EthersWallet implements Wallet {
         throw 0
     }
 
-    async sign(data: Signing.Signable): Promise<Signed> {
+    async sign(data: Signing.Signable): Promise<Signing.Signature> {
         throw 0
     }
 
@@ -53,14 +53,14 @@ class _Signer extends ethers.Signer {
     }
 
     async signMessage(message: Bytes): Promise<string> {
-        return ethers.utils.hexlify(await this._signer.sign(message))
+        return ethers.utils.hexlify(await this._signer.sign(message as Signing.Signable))
     }
 
     async signTransaction(transaction: ethers.utils.Deferrable<ethers.providers.TransactionRequest>): Promise<string> {
         let t = await ethers.utils.resolveProperties(transaction) as UnsignedTransaction
         if ((t as { from?: string }).from) delete (t as { from?: string }).from
         let m = ethers.utils.arrayify(ethers.utils.serializeTransaction(t))
-        return ethers.utils.serializeTransaction(t, await this._signer.sign(m))
+        return ethers.utils.serializeTransaction(t, await this._signer.sign(m as Signing.Signable))
     }
 
     connect(provider: ethers.providers.Provider): ethers.Signer {

@@ -8,31 +8,24 @@ import Store from './storage/Store'
 import RocksDBStore from './implementations/rocksdb/RocksDBStore'
 import Service from './api/Service'
 import { ethers } from 'ethers'
-
-class Settings {
-  // Geth (or compatible) server
-  readonly server = "" as string
-
-  // address used by validators
-  readonly address = "" as string
-
-  // mnemonic for mock signing service
-  readonly mnemonic = "" as string // for local testing only, won't be used in production
-}
+import Settings from './Settings'
+import { Hex } from './ethers/EthersTools'
+import { Key } from './ethers/EthersTypes'
 
 bind(Settings, JSON.parse(require("fs").readFileSync(".config.json").toString()) as Settings)
 bind(EthersProvider, new EthersProvider(inject(Settings).server))
 /** NOTE: this is a signer for local wallet (using menemonic). It should be replaced with signing service:
   * `bind(EthersSigner, new EthersSigner(async (dataToSign: Bytes) => returnSignedDataAsBytes(dataToSign))) */
-bind(EthersSigner, EthersSigner.from(inject(Settings).mnemonic))
+// bind(EthersSigner, EthersSigner.from(Hex.decode(inject(Settings).key) as Key.Private))
 
 const app = express()
 app.use(express.json())
 
 ; (async () => {
+    let key = Hex.decode(inject(Settings).key) as Key.Private
     let db = await RocksDBStore.create()
     bind(Store, new Store(db))
-    bind(Service, new Service(ethers.utils.arrayify(ethers.Wallet.fromMnemonic(inject(Settings).mnemonic).privateKey), inject(Settings).address))
+    bind(Service, new Service(key, inject(Settings).address))
     api(app)
 })()
 

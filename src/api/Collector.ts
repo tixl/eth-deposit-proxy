@@ -1,9 +1,9 @@
-import { ethers } from "ethers"
-import { Signable, Signature, Transaction } from "../ethers/EthersTypes"
-import JSBI from "jsbi"
-import EthersProvider from "../ethers/EthersProvider"
-import { inject } from "../core/System"
 import { bytes } from "../core/Core"
+import { inject } from "../core/System"
+import { ethers } from "ethers"
+import { Signing, Transaction } from "../ethers/EthersTypes"
+import EthersProvider from "../ethers/EthersProvider"
+import { Big } from "../ethers/EthersTools"
 
 export default class Collector {
     constructor(key: Bytes, address: string) {
@@ -18,19 +18,18 @@ export default class Collector {
         let m = ethers.utils.serializeTransaction({
             to: transaction.to[0].to,
             value: ethers.BigNumber.from(`${transaction.to[0].value}`),
-            data: transaction.from[0].data,
-            nonce: transaction.from[0].nonce,
-            gasLimit: ethers.BigNumber.from(`${transaction.from[0].gasLimit}`),
-            gasPrice: ethers.BigNumber.from(`${transaction.from[0].gasPrice}`),
-            chainId: transaction.from[0].chain,
+            data: transaction.data,
+            nonce: transaction.nonce,
+            gasLimit: ethers.BigNumber.from(`${transaction.gas.limit}`),
+            gasPrice: ethers.BigNumber.from(`${transaction.gas.price}`),
+            chainId: transaction.chain,
         })
         let k = new ethers.utils.SigningKey(this._derive(context))
-        let t = ethers.utils.arrayify(ethers.utils.joinSignature(k.signDigest(ethers.utils.keccak256(m))))
-        let s = {
-            data: t,
-            signer: { key: { type: "Public", data: ethers.utils.arrayify(k.compressedPublicKey) }, name: "" },
-        } as Signature
-        return { ...transaction, signed: [{ data: transaction.signable[0].data, signatures: [s] }] }
+        let s = ethers.utils.arrayify(ethers.utils.joinSignature(k.signDigest(ethers.utils.keccak256(m))))
+        return { ...transaction, signed: [{
+            data: transaction.signable[0],
+            signatures: [s as Signing.Signature] }],
+        }
     }
 
     async transaction(context: Bytes): Promise<Transaction | void> {
@@ -46,28 +45,23 @@ export default class Collector {
             gasPrice: p,
             chainId: (await this._provider["_provider"].getNetwork()).chainId,
         })
-        let s = {
-            data: ethers.utils.arrayify(m),
-            signers: [""],
-        } as Signable
         let t = ethers.utils.parseTransaction(m)
         if (t.value.isNegative() || t.value.isZero()) return
         return {
             from: [{
                 from: a,
-                value: JSBI.BigInt(`${t.value}`),
-                data: "",
-                nonce: t.nonce,
-                gasLimit: JSBI.BigInt(`${t.gasLimit}`),
-                gasPrice: JSBI.BigInt(`${t.gasPrice}`),
-                chain: t.chainId,
+                value: Big.int(t.value),
             }],
             to: [{
                 to: this.address,
-                value: JSBI.BigInt(`${t.value}`),
+                value: Big.int(t.value),
             }],
-            signable: [s],
+            signable: [ethers.utils.arrayify(m) as Signing.Signable],
             signed: [],
+            nonce: t.nonce,
+            data: "",
+            gas: { limit: Big.int(t.gasLimit), price: Big.int(t.gasPrice) },
+            chain: t.chainId,
         }
     }
 

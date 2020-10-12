@@ -16,10 +16,10 @@ export interface Wallet {
     receive(skipAddresses?: int): Promise<string>
 
     /** Sign provided data. */
-    sign(data: Signable): Promise<Signed>
+    sign(data: Signing.Signable): Promise<Signed>
 
     /** Return the public key of the signer. */
-    key(signer: string): Promise<Key<Public>>
+    key(signer: string): Promise<Key.Public>
 }
 
 /** Provider interface (e.g. geth). */
@@ -72,34 +72,23 @@ export interface Output {
 export interface Transaction {
     readonly from: readonly Input[]
     readonly to: readonly Output[]
-    readonly signable: readonly Signable[]
+    readonly signable: readonly Signing.Signable[]
     readonly signed: readonly Signed[]
-}
-
-export interface Signable {
-    readonly data: Bytes
-    readonly signers: readonly string[]
 }
 
 export interface Signed {
     readonly data: Bytes
-    readonly signatures: readonly Signature[]
+    readonly signatures: readonly Signing.Signature[]
 }
 
-export interface Signature {
-    readonly data: Bytes
-    readonly signer: Signer
+export namespace Signing {
+    export type Signable = Bytes & { readonly "": "Signable" }
+    export type Signature = Bytes & { readonly "": "Signature" }
+    export type Digest = Bytes & { readonly "": "Digest" }
+    export type Signer = Bytes & { readonly "": "Signer" }
 }
 
-export interface Signer {
-    readonly name: string
-    readonly key: Key<Public>
+export namespace Key {
+    export type Public = Bytes & { readonly "": "Public" }
+    export type Private = Bytes & { readonly "": "Private" }
 }
-
-export interface Key<T extends Public | Private> {
-    readonly type: T
-    readonly data: Bytes
-}
-
-export type Public = "Public"
-export type Private = "Private"

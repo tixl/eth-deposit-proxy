@@ -20,34 +20,23 @@ export interface Fund extends Types.Fund {
 export interface Transaction extends Types.Transaction {
     readonly from: readonly [Input]
     readonly to: readonly [Output]
-    readonly signable: readonly [Signable] | readonly []
+    readonly signable: readonly [Signing.Signable] | readonly []
     readonly signed: readonly [Signed] | readonly []
+    readonly nonce: int
+    readonly gas: { readonly limit: Natural, readonly price: Natural }
+    readonly data: string
+    readonly chain: int
 }
 
 export interface Input extends Types.Input {
-    readonly nonce: int
-    readonly gasLimit: Natural
-    readonly gasPrice: Natural
-    readonly data: string
-    readonly chain: int
 }
 
 export interface Output extends Types.Output {
 }
 
-export interface Signable extends Types.Signable {
-    readonly signers: readonly [string]
-}
-
 export interface Signed extends Types.Signed {
-    readonly signatures: readonly [Signature]
+    readonly signatures: readonly [Signing.Signature]
 }
 
-export interface Signature extends Types.Signature {
-}
-
-export interface Key<T extends Public | Private> extends Types.Key<T> {
-}
-
-export type Public = Types.Public
-export type Private = Types.Private
+export import Signing = Types.Signing
+export import Key = Types.Key

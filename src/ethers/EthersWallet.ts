@@ -1,5 +1,5 @@
 import { ethers, UnsignedTransaction } from "ethers"
-import { Fund, Wallet, Signable, Signed, Key, Public } from "./EthersTypes"
+import { Fund, Wallet, Signing, Signed, Key } from "./EthersTypes"
 import EthersSigner from "./EthersSigner"
 import EthersProvider from "./EthersProvider"
 
@@ -27,11 +27,11 @@ export default class EthersWallet implements Wallet {
         throw 0
     }
 
-    async sign(data: Signable): Promise<Signed> {
+    async sign(data: Signing.Signable): Promise<Signed> {
         throw 0
     }
 
-    async key(signer: string): Promise<Key<Public>> {
+    async key(signer: string): Promise<Key.Public> {
         throw 0
     }
 

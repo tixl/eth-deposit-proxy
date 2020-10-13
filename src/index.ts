@@ -2,12 +2,10 @@
 import express from 'express'
 import { inject, bind } from "./core/System"
 import EthersProvider from './ethers/EthersProvider'
-import EthersSigner from './experimental/EthersSigner'
 import api from "./api"
 import Store from './storage/Store'
 import RocksDBStore from './implementations/rocksdb/RocksDBStore'
 import Service from './api/Service'
-import { ethers } from 'ethers'
 import Settings from './Settings'
 import { Hex } from './ethers/EthersTools'
 import { Key } from './ethers/EthersTypes'

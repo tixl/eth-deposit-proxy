@@ -1,5 +1,6 @@
+// @ts-nocheck
 import { ethers, UnsignedTransaction } from "ethers"
-import { Fund, Wallet, Signing, Signed, Key } from "../ethers/EthersTypes"
+import { Fund, Wallet, Signing, Key } from "../ethers/EthersTypes"
 import EthersSigner from "./EthersSigner"
 import EthersProvider from "../ethers/EthersProvider"
 

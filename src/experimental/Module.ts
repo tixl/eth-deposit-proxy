@@ -1,7 +1,7 @@
 import { ethers } from "ethers"
 import EthersProvider from "../ethers/EthersProvider"
-import EthersSigner from "../ethers/EthersSigner"
-import EthersWallet from "../ethers/EthersWallet"
+import EthersSigner from "./EthersSigner"
+import EthersWallet from "./EthersWallet"
 import Compiler from "./Compiler"
 import Contract from "./Contract"
 

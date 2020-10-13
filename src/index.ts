@@ -2,7 +2,7 @@
 import express from 'express'
 import { inject, bind } from "./core/System"
 import EthersProvider from './ethers/EthersProvider'
-import EthersSigner from './ethers/EthersSigner'
+import EthersSigner from './experimental/EthersSigner'
 import api from "./api"
 import Store from './storage/Store'
 import RocksDBStore from './implementations/rocksdb/RocksDBStore'

@@ -1,37 +1,42 @@
 import { bytes } from "../core/Core"
 import { inject } from "../core/System"
-import { ethers } from "ethers"
-import { Key, Signing, Transaction } from "../ethers/EthersTypes"
+import { Transaction } from "../ethers/EthersTypes"
 import { Big, Digest, Signer } from "../ethers/EthersTools"
 import EthersEngine from "../ethers/EthersEngine"
 import EthersProvider from "../ethers/EthersProvider"
+import Receiver from "./Receiver"
 
+/** Collecting money from address, sending it to fixed destination. */
 export default class Collector {
+    /** NOTE: The key must always be kept secret. Address is the destinatin where the money will be sent */
     constructor(key: Bytes, address: string) {
         this.address = address
         this._key = key
     }
 
+    /** Destination address. */
     readonly address: string
 
+    /** Sign transaction from address derived from context. */
     sign(context: Bytes, transaction: Transaction): Transaction {
         if (!transaction.signable.length) return transaction
-        let s = Signer.sign(Digest.from(transaction.signable[0]), this._derive(context) as Key.Private)
+        let s = Signer.sign(Digest.from(transaction.signable[0]), Receiver.derive(this._key, context))
         return EthersEngine.sign(transaction, [{
             data: transaction.signable[0],
-            signatures: [s as Signing.Signature],
+            signatures: [s],
         }])
     }
 
+    /** Create unsigned transaction from address derived from context to destination address, spending all balance. */
     async transaction(context: Bytes): Promise<Transaction | void> {
-        let k = this._derive(context)
-        let a = ethers.utils.computeAddress(k)
+        let a = new Receiver(this._key).receive(context)
         let g = Big.multiply(this._provider.gas.limit, this._provider.gas.price)
         let v = Big.subtract(await this._provider.balance(a), g)
+        let n = await this._provider.nonce(a)
         let t = EthersEngine.transaction({
             from: [{ from: a, value: v }],
             to: [{ to: this.address, value: v }],
-            nonce: await this._provider["_provider"].getTransactionCount(a),
+            nonce: n,
             gas: this._provider.gas,
             data: "",
             chain: this._provider.chain,
@@ -42,13 +47,10 @@ export default class Collector {
         }
     }
 
+    /** Creates, signs, and sends collection transaction. */
     async collect(context: Bytes): Promise<string> {
         let t = await this.transaction(context)
         return t ? await this._provider.send(await this.sign(context, t)) : ""
-    }
-
-    private _derive(context: Bytes): Bytes {
-        return Digest.from(context, this._key)
     }
 
     private _provider = inject(EthersProvider)

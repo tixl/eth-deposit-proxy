@@ -1,7 +1,7 @@
 import Compiler from "./Compiler"
 import Contract from "./Contract"
 import Receiver from "./Receiver"
-import EthersWallet from "../ethers/EthersWallet"
+import EthersWallet from "./EthersWallet"
 import { ethers } from "ethers"
 import { Signing, Transaction } from "../ethers/EthersTypes"
 import JSBI from "jsbi"

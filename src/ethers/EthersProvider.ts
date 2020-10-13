@@ -60,6 +60,10 @@ class EthersProvider implements Provider {
         }
     }
 
+    async nonce(address: string): Promise<int> {
+        return await this._provider.getTransactionCount(address)
+    }
+
     private _provider: ethers.providers.Provider
     private _gas = { limit: Big.int(), price: Big.int() } as const
     private _blocks = 0

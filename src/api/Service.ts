@@ -7,31 +7,38 @@ import Store from "../storage/Store"
 import Data from "../data/Data"
 import { ethers } from "ethers"
 import JSBI from "jsbi"
-import { Transaction } from "../ethers/EthersTypes"
+import { Signing, Transaction } from "../ethers/EthersTypes"
 import EthersEngine from "../ethers/EthersEngine"
+import { Digest, Signer } from "../ethers/EthersTools"
 
+/** Fine-grained functions used by the API. */
 class Service {
+    /** NOTE: The key must be kept secret. Address is the destination address where money will be collected. */
     constructor(key: Bytes, address: string) {
         if (key?.length) this._key = key
         this._receiver = new Receiver(this._key)
         this._collector = new Collector(this._key, address)
     }
 
+    /** Remote blockchain state provider (provides public information only). */
     readonly provider = inject(EthersProvider)
 
+    /** Number of all tracked addresses in the database. */
     get size(): int {
         return this._n
     }
 
-    sign(context: Bytes, data: Bytes): Bytes {
-        let t = new ethers.utils.SigningKey(ethers.utils.keccak256(ethers.utils.concat([context, this._key])))
-        return ethers.utils.arrayify(ethers.utils.joinSignature(t.signDigest(ethers.utils.keccak256(data))))
+    /** Signs arbitrary data with private key corresponding to the given context. */
+    sign(context: Bytes, data: Signing.Signable): Signing.Signature {
+        return Signer.sign(Digest.from(data), Receiver.derive(this._key, context))
     }
 
+    /** Address belonging to the given context. */
     receive(context: Bytes): string {
         return this._receiver.receive(context)
     }
 
+    /** The index-th record in the database. */
     async at(index: int): Promise<Service.Record> {
         assert(unsigned(index) < this.size)
         let r = await this._data.get(Data.unsigned.encode(index))
@@ -51,11 +58,13 @@ class Service {
         }
     }
 
+    /** The index of the record containing the given address. */
     async index(address: string): Promise<int | void> {
         let t = await this._data.get(Data.string.encode(address))
         if (t.length) return Data.unsigned.decode(t).value
     }
 
+    /** Updates the state of the database with current information from blockchain provider. */
     async update(): Promise<void> {
         let t = await this._data.get(bytes())
         await this.provider.update()
@@ -69,6 +78,7 @@ class Service {
         }
     }
 
+    /** Add a new database record (if it doesn't exist already) for the given context. */
     async add(context: Bytes): Promise<void> {
         for await (let i of this) if (_equals(i.context, context)) return
         await this._task.work(async () => await this._data.batch([
@@ -84,21 +94,24 @@ class Service {
         this._n++
     }
 
+    /** Find all records having at least the given balance and number of confirmations. */
     async find(balance: Natural, confirmations: int): Promise<readonly Service.Record[]> {
         return await this._filter(balance, unsigned(confirmations), this.provider.blocks)
     }
 
+    /** Create an unsigned collect transaction from a database record. */
     async collect(record: Service.Record): Promise<Transaction | void> {
         if (`${record.balance}` == "0") return
         let t = await this._collector.transaction(record.context)
         if (t) t = await this._collector.sign(record.context, t)
         if (!t || !t.signed.length) return
-        let s = ethers.utils.arrayify(ethers.utils.keccak256(EthersEngine.signables(t)[0].data))
+        let s = ethers.utils.arrayify(ethers.utils.keccak256(EthersEngine.signables(t)[0]))
         let r = { ...record, transaction: Buffer.from(s).toString("hex") }
         await this._update(record.index, r)
         return t
     }
 
+    /** Iterator over the database record. */
     async *[Symbol.asyncIterator](): AsyncIterator<Service.Record> {
         for (let i = 0; i < this.size; i++) yield await this.at(i)
     }
@@ -140,6 +153,7 @@ namespace Service {
     }
 }
 
+// Used to make sure only one task is active at any time.
 class _Task {
     get busy(): boolean {
         return Boolean(this._busy)

@@ -1,6 +1,6 @@
 import { bytes } from "../core/Core"
-import { Key, Signing } from "./EthersTypes"
-import { Digest, Hex, Signer } from "./EthersTools"
+import { Key, Signing } from "../ethers/EthersTypes"
+import { Digest, Hex, Signer } from "../ethers/EthersTools"
 import { ethers } from "ethers"
 
 export default class EthersSigner {

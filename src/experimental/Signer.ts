@@ -1,6 +1,6 @@
 import { bytes } from "../core/Core"
 import { Hex } from "../ethers/EthersTools"
-import EthersSigner from "../ethers/EthersSigner"
+import EthersSigner from "./EthersSigner"
 import { Signing } from "../ethers/EthersTypes"
 
 export default class Signer {

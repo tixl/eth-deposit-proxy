@@ -1,7 +1,7 @@
 import { ethers, UnsignedTransaction } from "ethers"
-import { Fund, Wallet, Signing, Signed, Key } from "./EthersTypes"
+import { Fund, Wallet, Signing, Signed, Key } from "../ethers/EthersTypes"
 import EthersSigner from "./EthersSigner"
-import EthersProvider from "./EthersProvider"
+import EthersProvider from "../ethers/EthersProvider"
 
 export default class EthersWallet implements Wallet {
     constructor(provider: EthersProvider, wallet: EthersSigner | string) {

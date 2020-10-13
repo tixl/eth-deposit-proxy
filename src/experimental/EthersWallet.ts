@@ -1,7 +1,8 @@
+// @ts-nocheck
 import { ethers, UnsignedTransaction } from "ethers"
-import { Fund, Wallet, Signable, Signed, Key, Public } from "./EthersTypes"
+import { Fund, Wallet, Signing, Key } from "../ethers/EthersTypes"
 import EthersSigner from "./EthersSigner"
-import EthersProvider from "./EthersProvider"
+import EthersProvider from "../ethers/EthersProvider"
 
 export default class EthersWallet implements Wallet {
     constructor(provider: EthersProvider, wallet: EthersSigner | string) {
@@ -27,11 +28,11 @@ export default class EthersWallet implements Wallet {
         throw 0
     }
 
-    async sign(data: Signable): Promise<Signed> {
+    async sign(data: Signing.Signable): Promise<Signing.Signature> {
         throw 0
     }
 
-    async key(signer: string): Promise<Key<Public>> {
+    async key(signer: string): Promise<Key.Public> {
         throw 0
     }
 
@@ -53,14 +54,14 @@ class _Signer extends ethers.Signer {
     }
 
     async signMessage(message: Bytes): Promise<string> {
-        return ethers.utils.hexlify(await this._signer.sign(message))
+        return ethers.utils.hexlify(await this._signer.sign(message as Signing.Signable))
     }
 
     async signTransaction(transaction: ethers.utils.Deferrable<ethers.providers.TransactionRequest>): Promise<string> {
         let t = await ethers.utils.resolveProperties(transaction) as UnsignedTransaction
         if ((t as { from?: string }).from) delete (t as { from?: string }).from
         let m = ethers.utils.arrayify(ethers.utils.serializeTransaction(t))
-        return ethers.utils.serializeTransaction(t, await this._signer.sign(m))
+        return ethers.utils.serializeTransaction(t, await this._signer.sign(m as Signing.Signable))
     }
 
     connect(provider: ethers.providers.Provider): ethers.Signer {

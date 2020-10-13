@@ -1,85 +1,56 @@
-import { ethers } from "ethers"
-import { Signable, Signature, Transaction } from "../ethers/EthersTypes"
-import JSBI from "jsbi"
-import EthersProvider from "../ethers/EthersProvider"
-import { inject } from "../core/System"
 import { bytes } from "../core/Core"
+import { inject } from "../core/System"
+import { Transaction } from "../ethers/EthersTypes"
+import { Big, Digest, Signer } from "../ethers/EthersTools"
+import EthersEngine from "../ethers/EthersEngine"
+import EthersProvider from "../ethers/EthersProvider"
+import Receiver from "./Receiver"
 
+/** Collecting money from address, sending it to fixed destination. */
 export default class Collector {
+    /** NOTE: The key must always be kept secret. Address is the destinatin where the money will be sent */
     constructor(key: Bytes, address: string) {
         this.address = address
         this._key = key
     }
 
+    /** Destination address. */
     readonly address: string
 
-    async sign(context: Bytes, transaction: Transaction): Promise<Transaction> {
+    /** Sign transaction from address derived from context. */
+    sign(context: Bytes, transaction: Transaction): Transaction {
         if (!transaction.signable.length) return transaction
-        let m = ethers.utils.serializeTransaction({
-            to: transaction.to[0].to,
-            value: ethers.BigNumber.from(`${transaction.to[0].value}`),
-            data: transaction.from[0].data,
-            nonce: transaction.from[0].nonce,
-            gasLimit: ethers.BigNumber.from(`${transaction.from[0].gasLimit}`),
-            gasPrice: ethers.BigNumber.from(`${transaction.from[0].gasPrice}`),
-            chainId: transaction.from[0].chain,
-        })
-        let k = new ethers.utils.SigningKey(this._derive(context))
-        let t = ethers.utils.arrayify(ethers.utils.joinSignature(k.signDigest(ethers.utils.keccak256(m))))
-        let s = {
-            data: t,
-            signer: { key: { type: "Public", data: ethers.utils.arrayify(k.compressedPublicKey) }, name: "" },
-        } as Signature
-        return { ...transaction, signed: [{ data: transaction.signable[0].data, signatures: [s] }] }
+        let s = Signer.sign(Digest.from(transaction.signable[0]), Receiver.derive(this._key, context))
+        return EthersEngine.sign(transaction, [{
+            data: transaction.signable[0],
+            signatures: [s],
+        }])
     }
 
+    /** Create unsigned transaction from address derived from context to destination address, spending all balance. */
     async transaction(context: Bytes): Promise<Transaction | void> {
-        let k = this._derive(context)
-        let a = ethers.utils.computeAddress(k)
-        let g = await this._provider["_provider"].estimateGas({})
-        let p = await this._provider["_provider"].getGasPrice()
-        let m = ethers.utils.serializeTransaction({
-            to: this.address,
-            value: ethers.BigNumber.from(`${await this._provider.balance(a)}`).sub(g.mul(p)),
-            nonce: await this._provider["_provider"].getTransactionCount(a),
-            gasLimit: g,
-            gasPrice: p,
-            chainId: (await this._provider["_provider"].getNetwork()).chainId,
+        let a = new Receiver(this._key).receive(context)
+        let g = Big.multiply(this._provider.gas.limit, this._provider.gas.price)
+        let v = Big.subtract(await this._provider.balance(a), g)
+        let n = await this._provider.nonce(a)
+        let t = EthersEngine.transaction({
+            from: [{ from: a, value: v }],
+            to: [{ to: this.address, value: v }],
+            nonce: n,
+            gas: this._provider.gas,
+            data: "",
+            chain: this._provider.chain,
         })
-        let s = {
-            data: ethers.utils.arrayify(m),
-            signers: [""],
-        } as Signable
-        let t = ethers.utils.parseTransaction(m)
-        if (t.value.isNegative() || t.value.isZero()) return
         return {
-            from: [{
-                from: a,
-                value: JSBI.BigInt(`${t.value}`),
-                data: "",
-                nonce: t.nonce,
-                gasLimit: JSBI.BigInt(`${t.gasLimit}`),
-                gasPrice: JSBI.BigInt(`${t.gasPrice}`),
-                chain: t.chainId,
-            }],
-            to: [{
-                to: this.address,
-                value: JSBI.BigInt(`${t.value}`),
-            }],
-            signable: [s],
-            signed: [],
+            ...t,
+            signable: EthersEngine.signables(t),
         }
     }
 
-    async collect(context: Bytes): Promise<void> {
+    /** Creates, signs, and sends collection transaction. */
+    async collect(context: Bytes): Promise<string> {
         let t = await this.transaction(context)
-        if (!t) return
-        let s = await this.sign(context, t)
-        await this._provider.send(s)
-    }
-
-    private _derive(context: Bytes): Bytes {
-        return ethers.utils.arrayify(ethers.utils.keccak256(ethers.utils.concat([context, this._key])))
+        return t ? await this._provider.send(await this.sign(context, t)) : ""
     }
 
     private _provider = inject(EthersProvider)

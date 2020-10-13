@@ -4,7 +4,7 @@ import RocksDB from "rocksdb"
 
 /** Store backed by RocksDB. */
 export default class RocksDBStore implements Store.Model {
-    /** Create a new store. */
+    /** Create a new store, optionally using a directory relative to the current working directory (default: "data"). */
     static async create(path?: string): Promise<Store> {
         return await new Promise<Store>((done: (value: Store) => void, fail: () => void): void => {
             let t = new RocksDBStore(path)
@@ -60,10 +60,6 @@ export default class RocksDBStore implements Store.Model {
             return
         }
         if (items.length) return await new Promise<void>((done: () => void, fail: () => void): void => {
-            console.log(items.map(x => {
-                let k = x[0].length ? _bytes(x[0]) : _zero
-                return x[1].length ? { type: "put", key: k, value: _bytes(x[1]) } : { type: "del", key: k }
-            }))
             this._db.batch(items.map(x => {
                 let k = x[0].length ? _bytes(x[0]) : _zero
                 return x[1].length ? { type: "put", key: k, value: _bytes(x[1]) } : { type: "del", key: k }

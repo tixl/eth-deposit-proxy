@@ -1,7 +1,8 @@
-import { Payment, Provider, Transaction, Key, Public } from "./EthersTypes"
+import { unsigned } from "../core/Core"
+import { Payment, Provider, Transaction } from "./EthersTypes"
+import EthersEngine from "./EthersEngine"
+import { Big, Hex } from "./EthersTools"
 import { ethers } from "ethers"
-import JSBI from "jsbi"
-import { bytes, unsigned } from "../core/Core"
 
 class EthersProvider implements Provider {
     static readonly model = `${process.env["HOME"]}/.rinkeby/geth.ipc` as EthersProvider.Model
@@ -14,8 +15,21 @@ class EthersProvider implements Provider {
         return this._blocks
     }
 
+    get chain(): int {
+        return this._chain
+    }
+
+    get gas(): { readonly limit: Natural, readonly price: Natural } {
+        return this._gas
+    }
+
     async update(): Promise<void> {
+        if (!this._chain) this._chain = (await this._provider.getNetwork()).chainId
         this._blocks = await this._provider.getBlockNumber() + 1
+        this._gas = {
+            limit: Big.int(await this._provider.estimateGas({})),
+            price: Big.int(await this._provider.getGasPrice()),
+        }
     }
 
     async block(block: int): Promise<readonly string[]> {
@@ -23,22 +37,13 @@ class EthersProvider implements Provider {
     }
 
     async balance(address: string): Promise<Natural> {
-        return JSBI.BigInt((await this._provider.getBalance(address)).toString())
+        return Big.int((await this._provider.getBalance(address)).toString())
     }
 
     async send(transaction: Transaction): Promise<string> {
         if (!transaction.signed.length) return ""
-        let s = transaction.signed[0].signatures[0].data
-        let t = ethers.utils.serializeTransaction({
-            to: transaction.to[0].to,
-            value: ethers.BigNumber.from(`${transaction.from[0].value}`),
-            nonce: transaction.from[0].nonce,
-            gasLimit: ethers.BigNumber.from(`${transaction.from[0].gasLimit}`),
-            gasPrice: ethers.BigNumber.from(`${transaction.from[0].gasPrice}`),
-            data: transaction.from[0].data,
-            chainId: transaction.from[0].chain,
-        }, s)
-        let r = await this._provider.sendTransaction(t)
+        let t = EthersEngine.signables(transaction)[0]
+        let r = await this._provider.sendTransaction(Hex.encode(t))
         return r.hash
     }
 
@@ -49,32 +54,20 @@ class EthersProvider implements Provider {
     async transaction(hash: string): Promise<Payment> {
         let t = await this._provider.getTransaction(hash)
         let s = ethers.utils.joinSignature({ r: t.r as string, s: t.s, v: t.v })
-        let m = hash ? ethers.utils.arrayify(hash) : bytes()
-        let k = { type: "Public", data: ethers.utils.arrayify(ethers.utils.recoverPublicKey(m, s)) } as Key<Public>
         return {
-            transaction: {
-                from: [{
-                    from: t.from || "",
-                    value: JSBI.BigInt(`${t.value}`),
-                    nonce: t.nonce,
-                    gasLimit: JSBI.BigInt(`${t.gasLimit}`),
-                    gasPrice: JSBI.BigInt(`${t.gasPrice}`),
-                    data: t.data,
-                    chain: t.chainId,
-                }],
-                to: [{ to: t.to || "", value: JSBI.BigInt(`${t.value}`) }],
-                signable: [],
-                signed: [{
-                    data: m,
-                    signatures: [{ data: ethers.utils.arrayify(s), signer: { name: t.from || "", key: k } }],
-                }],
-            },
+            transaction: EthersEngine.transaction(Hex.decode(ethers.utils.serializeTransaction(t, s))),
             confirmations: t.confirmations,
         }
     }
 
+    async nonce(address: string): Promise<int> {
+        return await this._provider.getTransactionCount(address)
+    }
+
     private _provider: ethers.providers.Provider
+    private _gas = { limit: Big.int(), price: Big.int() } as const
     private _blocks = 0
+    private _chain = 0
 }
 
 namespace EthersProvider {

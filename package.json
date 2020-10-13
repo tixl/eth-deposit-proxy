@@ -4,12 +4,10 @@
   "author": "Tixl Team <team@tixl.me>",
   "license": "MIT",
   "scripts": {
-    "start": "ts-node src/index.ts",
+    "start": "ts-node -T src/index.ts",
     "build": "tsc",
-    "deploy": "ts-node -T src/deploy",
-    "signer": "ts-node -T src/signer",
-    "receive": "ts-node -T src/receive",
-    "collect": "ts-node -T src/collect"
+    "check": "tsc --noEmit",
+    "debug": "node --experimental-repl-await ./debug"
   },
   "dependencies": {
     "@types/express": "^4.17.8",

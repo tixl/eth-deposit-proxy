@@ -1,9 +1,11 @@
 import { assert, bytes, unsigned } from "../core/Core"
 
+/** Efficient binary encoding and decoding of structured data. */
 class Data {
+    /** Encoding and decoding of unsigned integers. */
     static readonly unsigned = new class implements Data.Type<int> {
         encode(value?: int): Bytes {
-            if (!value) return this._zero
+            if (!value) return this.#zero
             let t = [] as int[]
             for (let i = unsigned(value); i; i = (i - (i & 127)) / 128) t.push(t.length ? (i & 127) | 128 : i & 127)
             return bytes(t.reverse())
@@ -20,9 +22,10 @@ class Data {
             assert(false)
         }
 
-        private _zero = bytes([0])
+        #zero = bytes([0])
     }
 
+    /** Encoding and decoding of binary data. The data has length prefix in the form of unsigned integer. */
     static readonly bytes = new class implements Data.Type<Bytes> {
         encode(value?: Bytes): Bytes {
             return Data.packed.encode([Data.unsigned.encode(value?.length || 0), value || bytes()])
@@ -34,6 +37,7 @@ class Data {
         }
     }
 
+    /** Encoding and decoding of string. The string has length prefix in the form of unsigned integer. */
     static readonly string = new class implements Data.Type<string> {
         encode(value?: string): Bytes {
             return Data.bytes.encode(value?.length ? _utf8.encoder.encode(value) : bytes())
@@ -45,6 +49,7 @@ class Data {
         }
     }
 
+    /** Packed encoding of data chunks. No length prefix is added. */
     static readonly packed = new class implements Data.Type<readonly Bytes[]> {
         encode(value?: readonly Bytes[]): Bytes {
             let n = 0
@@ -67,6 +72,7 @@ class Data {
         }
     }
 
+    /** Length prefixed version of arbitrary data type. */
     static boxed<Type>(type: Data.Type<Type>): Data.Type<Type> {
         return new class implements Data.Type<Type> {
             encode(value?: Type): Bytes {
@@ -83,6 +89,7 @@ class Data {
         }
     }
 
+    /** Fixed length data. */
     static fixed(size: int): Data.Type<Bytes> {
         return !unsigned(size) ? _zero : new class implements Data.Type<Bytes> {
             encode(value?: Bytes): Bytes {
@@ -98,6 +105,7 @@ class Data {
         }
     }
 
+    /** Pack the data procedurally (e.g. `Data.pack(pack => [pack(Data.unsigned, 1), pack(Data.unsigned, 2)])`). */
     static pack(type: (pack: <T>(type: Data.Type<T>, value: T) => T) => void): Bytes {
         let t = [] as Bytes[]
         type((pack, value) => {
@@ -109,6 +117,7 @@ class Data {
         return this.packed.encode(t)
     }
 
+    /** Read data procedurally (e.g. `Data.read(read => ({ a: read(Data.unsigned), b: read(Data.unsigned) }))`). */
     static read<Type>(data: Bytes, type: (read: <T>(type: Data.Type<T>) => T) => Type): Type {
         let v = void 0
         let s = data
@@ -120,21 +129,25 @@ class Data {
         })
     }
 
+    /** Encode a string to UTF8 encoded data. */
     static encode(value: string): Bytes {
         return value ? _utf8.encoder.encode(value) : bytes()
     }
 
+    /** Decode UTF8 encoded data to string. */
     static decode(data: Bytes): string {
         return data.length ? _utf8.decoder.decode(data) : ""
     }
 }
 
 namespace Data {
+    /** Interface required for encoding and decoding data. */
     export interface Type<Type> {
         encode(value?: Type): Bytes
         decode(data: Bytes): Part<Type>
     }
 
+    /** Partially decoded structured data (the remanning yet undecoded data is in stack). */
     export interface Part<Type> {
         readonly value: Type
         readonly stack: Bytes

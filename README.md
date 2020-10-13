@@ -8,9 +8,61 @@ the Tixl block is deposited on with his ETH private key and provide that signatu
 
 This service will create disposable ETH addresses and create the signature on the users behalf.
 
+## Installation
+
+A JSON configuration object `.config.json` complient with the following interface must be provided:
+```
+{
+    server: string // url to Geth server, e.g. "http://207.154.253.13:8545"
+    address: string // where the money is sent to (pool address), e.g.: "0x0dF22FdeD1D944365B6561B7a620a48E3f4D3CCe"
+    key: string // signing key (hex encoded private key)
+}
+```
+
 ## Interface
 
 The service exposes a HTTP API:
+
+Core API:
+
+```
+POST /create
+    request body: context (hex string)
+        Context is any string unique to the wallet owner (e.g.: chainSigPubKey)
+    response body: string
+        Returns address. The address is added to the database of tracked addresses
+```
+
+```
+GET /status/:address (string)
+    response body: { confirmations: int, transaction: string }
+        Transaction may be an empty string if transaction to the pool address has not been created yet.
+        Confirmations is the number of confirmations since the last balance change of the address.
+```
+
+Extra API (may not be needed):
+
+```
+GET /sign/:message (hex string)
+    response body: signature (hex string)
+        Return signature for the given message. Is this needed at all?
+```
+
+Debug API:
+
+```
+POST /update
+    notes: This triggers the scan of all addresses. Only for debugging purposes (in production scans can be
+    triggered automatically).
+```
+
+```
+POST /collect
+    request body: address (string)
+    notes: This will transfer money from the generated address to the single pool address. The trsansaction hash will be
+    stored in the database and reported in future /status calls. Only for debugging purposes (in production collects can
+    be automatic).
+```
 
 POST /create body: {chainSigPubKey: string} returns JSON {address: string, signature: string}
 
@@ -32,7 +84,6 @@ The method will return the array of addresses (together with balances and confir
 1. have at least the specified balance
 2. have at least the specified number of confirmations
 
-
 ## Method lifecycle
 When the /create endpoint is called the service creates a new address and holds the private key. It signs `chainSigPubKey` which is an ASCII string with the private key and returns the address and the signature.
 
@@ -44,6 +95,13 @@ The /status endpoint reports how many confirmations it has seen for the incoming
 
 
 *Alternative: The addresses are created from a HD wallet and the master private key is passed to the service on start, so only the address and HD path have to be saved.
+
+## Code organization
+
+There are two implementations:
+1. Standard implementation: works as designed, addresses and corresponding keys are created on demand.
+2. Experimental implementation: (only in `src/experimental`) contract-based implementation (it has one security benefit:
+    funds can ONLY be sent to the pool address, sending to any other address is not possible).
 
 ## Misc
 - Ask us if you don’t understand how something should work

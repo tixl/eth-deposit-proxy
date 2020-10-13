@@ -1,5 +1,5 @@
 import Compiler from "./Compiler"
-import EthersWallet from "../ethers/EthersWallet"
+import EthersWallet from "./EthersWallet"
 import { ethers } from "ethers"
 
 export default class Contract {
